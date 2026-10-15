@@ -11,6 +11,7 @@ export function RiderTable({ riders }: { riders: Rider[] }) {
       <THead>
         <TR>
           <TH>Name</TH>
+          <TH>Customer ID</TH>
           <TH>Phone</TH>
           <TH>Status</TH>
           <TH>Paid token</TH>
@@ -24,6 +25,7 @@ export function RiderTable({ riders }: { riders: Rider[] }) {
                 {r.name}
               </Link>
             </TD>
+            <TD className="tabular-nums">{r.customerId ?? '—'}</TD>
             <TD className="tabular-nums">{r.phone}</TD>
             <TD>
               <RiderStatusBadge status={r.status} />

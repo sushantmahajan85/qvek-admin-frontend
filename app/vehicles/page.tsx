@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/input';
 import { TD, TH, THead, TR, Table } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { AssignDialog, VehicleDialog } from '@/features/fleet/dialogs';
+import { RecordDialog } from '@/features/fleet/ops-dialogs';
 import { useVehicles } from '@/features/fleet/hooks';
 
 export default function VehiclesPage() {
@@ -31,17 +32,23 @@ export default function VehiclesPage() {
             <THead>
               <TR>
                 <TH>Vehicle</TH>
+                <TH>Chassis</TH>
                 <TH>IOP id</TH>
                 <TH>Status</TH>
+                <TH>Record</TH>
               </TR>
             </THead>
             <tbody>
               {data.map((v) => (
                 <TR key={v.id}>
                   <TD className="font-medium tabular-nums">{v.vehicleNo}</TD>
+                  <TD className="tabular-nums">{v.chassisNo ?? '—'}</TD>
                   <TD className="tabular-nums">{v.iopId}</TD>
                   <TD>
                     <Badge tone={v.status === 'ACTIVE' ? 'green' : 'slate'}>{v.status}</Badge>
+                  </TD>
+                  <TD>
+                    <RecordDialog row={{ ...v, lat: null, lng: null, lastPingAt: null, assignment: null, rider: null, recovery: null }} />
                   </TD>
                 </TR>
               ))}

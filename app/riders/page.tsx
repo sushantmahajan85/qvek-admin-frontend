@@ -5,6 +5,7 @@ import { PanelChrome } from '@/components/shared/panel-chrome';
 import { EmptyState, SearchInput } from '@/components/shared/search';
 import { Skeleton } from '@/components/ui/input';
 import { StatusPills, type RiderFilter } from '@/features/riders/pills';
+import { CreateDialog } from '@/features/riders/dialogs';
 import { RiderTable } from '@/features/riders/table';
 import { useRiders } from '@/features/riders/hooks';
 
@@ -28,7 +29,10 @@ export default function RidersPage() {
               {filtered.length} rider{filtered.length === 1 ? '' : 's'} · approve KYC, manage lifecycle
             </p>
           </div>
-          <SearchInput value={q} onChange={setQ} />
+          <div className="flex items-center gap-2">
+            <SearchInput value={q} onChange={setQ} />
+            <CreateDialog />
+          </div>
         </div>
         <StatusPills value={status} onChange={setStatus} counts={counts} />
         {isLoading ? (

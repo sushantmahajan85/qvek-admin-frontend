@@ -5,6 +5,7 @@ export interface Rider {
   id: string;
   name: string;
   phone: string;
+  customerId?: string | null;
   age?: number | null;
   platform?: string | null;
   status: RiderStatus;
@@ -37,6 +38,21 @@ export async function getRider(id: string): Promise<RiderDetail> {
 
 export async function approveRider(id: string, paidToken: boolean): Promise<Rider> {
   return apiPost<Rider>(`/admin/riders/${id}/approve`, { paidToken });
+}
+
+export interface CreateRiderInput {
+  name: string;
+  phone: string;
+  age?: number;
+  platform?: string;
+}
+
+export async function createRider(input: CreateRiderInput): Promise<Rider> {
+  return apiPost<Rider>('/admin/riders', input);
+}
+
+export async function rejectRider(id: string, reason: string): Promise<Rider> {
+  return apiPost<Rider>(`/admin/riders/${id}/reject`, { reason });
 }
 
 export async function transitionRider(id: string, status: RiderStatus, reason: string): Promise<Rider> {

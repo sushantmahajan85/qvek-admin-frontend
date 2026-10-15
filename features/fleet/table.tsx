@@ -1,18 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import { Check, Copy, MapPin } from 'lucide-react';
+import { Check, Copy, MapPin, MoonStar } from 'lucide-react';
 import * as React from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { TD, TH, THead, TR, RowActions, Table } from '@/components/ui/table';
+import { VEHICLE_STATUS_LABEL } from '@/lib/constants';
 import { RiderStatusBadge } from '@/features/riders/badge';
 import type { FleetRow } from './api';
 
-const TONE: Record<string, 'green' | 'amber' | 'red' | 'slate'> = {
+const TONE: Record<string, 'green' | 'amber' | 'red' | 'slate' | 'blue'> = {
   ACTIVE: 'green',
-  WARNING: 'amber',
-  DISARMED: 'red',
+  IMMOBILIZED: 'red',
+  GRACE: 'amber',
+  REPAIR: 'amber',
   OFFLINE: 'slate',
 };
 
@@ -54,20 +56,34 @@ export function FleetTable({ rows }: { rows: FleetRow[] }) {
           <TH>Vehicle</TH>
           <TH>Status</TH>
           <TH>Rider</TH>
+          <TH>Plan valid till</TH>
+          <TH>Last GPS</TH>
           <TH>Recovery</TH>
         </TR>
       </THead>
       <tbody>
         {rows.map((r) => (
           <TR key={r.id}>
-            <TD className="font-medium tabular-nums">{r.vehicleNo}</TD>
             <TD>
-              <Badge tone={TONE[r.status] ?? 'slate'}>{r.status}</Badge>
+              <p className="font-medium tabular-nums">{r.vehicleNo}</p>
+              <p className="text-xs text-muted2 tabular-nums">
+                {r.chassisNo ? `Chassis ${r.chassisNo}` : 'No chassis on file'}
+              </p>
+            </TD>
+            <TD>
+              <span className="flex items-center gap-1.5">
+                <Badge tone={TONE[r.status] ?? 'slate'}>{VEHICLE_STATUS_LABEL[r.status] ?? r.status}</Badge>
+                {r.idle && (
+                  <span title="No movement in 72 hours" className="text-amber-600 dark:text-amber-400">
+                    <MoonStar className="size-4" />
+                  </span>
+                )}
+              </span>
             </TD>
             <TD>
               {r.rider ? (
-                <span className="flex items-center gap-2">
-                  <Link className="underline-offset-4 hover:underline" href={`/riders/${r.rider.id}`}>
+                <span className="flex flex-col gap-1">
+                  <Link className="font-medium underline-offset-4 hover:underline" href={`/riders/${r.rider.id}`}>
                     {r.rider.name}
                   </Link>
                   <RiderStatusBadge status={r.rider.status} />
@@ -75,6 +91,12 @@ export function FleetTable({ rows }: { rows: FleetRow[] }) {
               ) : (
                 <span className="text-muted2">Unassigned</span>
               )}
+            </TD>
+            <TD className="tabular-nums">
+              {r.rider?.planValidity ? new Date(r.rider.planValidity).toLocaleDateString('en-IN') : '—'}
+            </TD>
+            <TD className="tabular-nums">
+              {r.lastPingAt ? new Date(r.lastPingAt).toLocaleString('en-IN') : '—'}
             </TD>
             <TD>
               <RecoveryCell row={r} />
@@ -89,7 +111,7 @@ export function FleetTable({ rows }: { rows: FleetRow[] }) {
 export function DisarmNote() {
   return (
     <p className="text-xs text-muted2">
-      Remote disarm / reactivate arrives with Phase 4 backend — statuses above are display-only for now.
+      Manual immobilize / unlock arrives with Phase 5 IOP integration — statuses above are display-only for now.
     </p>
   );
 }

@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { clearSession } from '@/lib/auth-session';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, Users, Truck, Bike, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Truck, Bike, Settings, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
 import { ThemeToggle } from './theme-toggle';
@@ -15,6 +15,7 @@ const NAV = [
   { href: '/riders', label: 'Riders', icon: Users },
   { href: '/fleet', label: 'Fleet', icon: Truck },
   { href: '/vehicles', label: 'Vehicles', icon: Bike },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export function PanelChrome({ children }: { children: React.ReactNode }) {

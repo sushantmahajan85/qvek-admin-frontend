@@ -7,11 +7,21 @@ export const loginSchema = z.object({
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
-export interface Session {
-  accessToken: string;
-  refreshToken: string;
+export type LoginResult =
+  | { mfaRequired: false; accessToken: string; refreshToken: string }
+  | { mfaRequired: true; tempToken: string };
+
+export async function adminLogin(input: LoginInput): Promise<LoginResult> {
+  return apiPost<LoginResult>('/auth/admin/login', input);
 }
 
-export async function adminLogin(input: LoginInput): Promise<Session> {
-  return apiPost<Session>('/auth/admin/login', input);
+export async function verifyMfa(tempToken: string, code: string) {
+  return apiPost<{ accessToken: string; refreshToken: string }>('/auth/admin/mfa/verify', {
+    tempToken,
+    code,
+  });
+}
+
+export async function setupMfa(): Promise<{ otpauthUrl: string }> {
+  return apiPost<{ otpauthUrl: string }>('/auth/admin/mfa/setup');
 }

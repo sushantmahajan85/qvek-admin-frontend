@@ -22,8 +22,34 @@ export const RIDER_STATUS_LABEL: Record<RiderStatus, string> = {
   REPAIR_REQ: 'Repair req',
 };
 
-export const VEHICLE_STATUS = ['ACTIVE', 'WARNING', 'DISARMED', 'OFFLINE'] as const;
+export const VEHICLE_STATUS = ['ACTIVE', 'IMMOBILIZED', 'GRACE', 'REPAIR', 'OFFLINE'] as const;
 export type VehicleStatus = (typeof VEHICLE_STATUS)[number];
+
+export const VEHICLE_STATUS_LABEL: Record<VehicleStatus, string> = {
+  ACTIVE: 'Active',
+  IMMOBILIZED: 'Immobilized',
+  GRACE: 'Grace period',
+  REPAIR: 'Repair required',
+  OFFLINE: 'Offline',
+};
+
+export const PLANS = ['WEEKLY', '2-WEEKLY', 'MONTHLY'] as const;
+export type PlanId = (typeof PLANS)[number];
+
+export const PLAN_LABEL: Record<PlanId, string> = {
+  WEEKLY: 'Weekly',
+  '2-WEEKLY': '2-Weekly',
+  MONTHLY: 'Monthly',
+};
+
+export const TIMELINE_FILTERS = ['all', 'recharge', 'service'] as const;
+export type TimelineFilter = (typeof TIMELINE_FILTERS)[number];
+
+export const TIMELINE_FILTER_LABEL: Record<TimelineFilter, string> = {
+  all: 'All',
+  recharge: 'Recharge Payments',
+  service: 'Service Logs',
+};
 
 export const TIMELINE_KIND = ['DEPOSIT', 'RENT', 'ADJUSTMENT', 'REFUND', 'SETTLEMENT'] as const;
 export type TimelineKind = (typeof TIMELINE_KIND)[number];

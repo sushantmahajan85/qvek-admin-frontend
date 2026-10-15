@@ -9,8 +9,14 @@ import {
   createVehicle,
   getFleet,
   listVehicles,
+  logExpense,
+  replaceVehicle,
+  updateRecord,
   type AssignInput,
+  type ExpenseInput,
+  type ReplaceInput,
   type VehicleInput,
+  type VehicleRecord,
 } from './api';
 
 export function useFleet() {
@@ -43,6 +49,46 @@ export function useAssignVehicle() {
       qc.invalidateQueries({ queryKey: ['vehicles'] });
       qc.invalidateQueries({ queryKey: ['riders'] });
       toast.success('Vehicle assigned — rental starts through next Tuesday');
+    },
+    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+  });
+}
+
+export function useUpdateRecord(vehicleId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: VehicleRecord) => updateRecord(vehicleId, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fleet'] });
+      qc.invalidateQueries({ queryKey: ['vehicles'] });
+      toast.success('Vehicle record updated');
+    },
+    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+  });
+}
+
+export function useReplaceVehicle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ReplaceInput) => replaceVehicle(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fleet'] });
+      qc.invalidateQueries({ queryKey: ['vehicles'] });
+      toast.success('Vehicle swapped — rental continues uninterrupted');
+    },
+    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+  });
+}
+
+export function useLogExpense(riderId?: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ExpenseInput) => logExpense(input),
+    onSuccess: () => {
+      if (riderId) {
+        qc.invalidateQueries({ queryKey: ['timeline', riderId] });
+      }
+      toast.success('Expense logged — visible under Service Logs');
     },
     onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
   });

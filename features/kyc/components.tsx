@@ -70,12 +70,11 @@ export function KycCard({ kyc, loading }: { kyc?: KycData | null; loading?: bool
   );
 }
 
-const FIELDS: Array<{ name: keyof KycInput; label: string; placeholder: string }> = [
+const FIELDS: Array<{ name: 'fullName' | 'aadhaarNo' | 'panNo' | 'dlNo'; label: string; placeholder: string }> = [
   { name: 'fullName', label: 'Full name', placeholder: 'As per Aadhaar' },
   { name: 'aadhaarNo', label: 'Aadhaar number', placeholder: '12 digits' },
   { name: 'panNo', label: 'PAN', placeholder: '10 chars' },
   { name: 'dlNo', label: 'Driving licence', placeholder: 'DL number' },
-  { name: 'bankAcctNo', label: 'Bank account', placeholder: 'Account number' },
 ];
 
 export function KycForm({ riderId, initial }: { riderId: string; initial?: KycData | null }) {
