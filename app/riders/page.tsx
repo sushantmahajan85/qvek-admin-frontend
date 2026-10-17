@@ -1,7 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { PanelChrome } from '@/components/shared/panel-chrome';
+import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { PageHeader, PanelChrome } from '@/components/shared/panel-chrome';
 import { EmptyState, SearchInput } from '@/components/shared/search';
 import { Skeleton } from '@/components/ui/input';
 import { StatusPills, type RiderFilter } from '@/features/riders/pills';
@@ -10,7 +12,18 @@ import { RiderTable } from '@/features/riders/table';
 import { useRiders } from '@/features/riders/hooks';
 
 export default function RidersPage() {
-  const [q, setQ] = React.useState('');
+  return (
+    <PanelChrome>
+      <Suspense>
+        <RidersContent />
+      </Suspense>
+    </PanelChrome>
+  );
+}
+
+function RidersContent() {
+  const params = useSearchParams();
+  const [q, setQ] = React.useState(params.get('q') ?? '');
   const [status, setStatus] = React.useState<RiderFilter>('ALL');
   const { data, isLoading, isError } = useRiders(q);
   const filtered = (data ?? []).filter((r) => status === 'ALL' || r.status === status);
@@ -20,20 +33,18 @@ export default function RidersPage() {
     return c;
   }, [data]);
   return (
-    <PanelChrome>
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold">Riders</h1>
-            <p className="text-sm text-muted2">
-              {filtered.length} rider{filtered.length === 1 ? '' : 's'} · approve KYC, manage lifecycle
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        eyebrow={`${filtered.length} rider${filtered.length === 1 ? '' : 's'}`}
+        title="Riders"
+        description="Approve KYC, manage lifecycle and recovery."
+        actions={
+          <>
             <SearchInput value={q} onChange={setQ} />
             <CreateDialog />
-          </div>
-        </div>
+          </>
+        }
+      />
         <StatusPills value={status} onChange={setStatus} counts={counts} />
         {isLoading ? (
           <Skeleton className="h-40 w-full" />
@@ -44,7 +55,6 @@ export default function RidersPage() {
         ) : (
           <RiderTable riders={filtered} />
         )}
-      </div>
-    </PanelChrome>
+    </div>
   );
 }
