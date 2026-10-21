@@ -1,53 +1,10 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* Qvek theme vars — SET BY lib/theme.ts at runtime (THEMES presets).
-   Fallbacks below = light default so first paint is white even before hydration. */
-:root {
-  --qvek-bg: #f7f7f5;
-  --qvek-card: #ffffff;
-  --qvek-border: color-mix(in srgb, #9ea1a6 38%, #ffffff);
-  --qvek-text: #1c1c1c;
-  --qvek-text-2: #a6a6a6;
-  --qvek-accent: #1c1c1c;
-  --qvek-accent-text: #ffffff;
-  --qvek-hover: color-mix(in srgb, #9ea1a6 16%, transparent);
-}
-
-body {
-  background: var(--qvek-bg);
-  color: var(--qvek-text);
-}
-
-/* ---- Motion (flat design: movement, not shadows) ---- */
-@keyframes qvek-overlay-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes qvek-overlay-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
-}
-@keyframes qvek-dialog-in {
-  from { opacity: 0; transform: translate(-50%, -48%) scale(0.97); }
-  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-}
-@keyframes qvek-dialog-out {
-  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  to { opacity: 0; transform: translate(-50%, -48%) scale(0.97); }
-}
-@keyframes qvek-rise-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.qvek-overlay[data-state='open'] { animation: qvek-overlay-in 160ms ease-out; }
-.qvek-overlay[data-state='closed'] { animation: qvek-overlay-out 140ms ease-in; }
-.qvek-dialog[data-state='open'] { animation: qvek-dialog-in 190ms cubic-bezier(0.16, 1, 0.3, 1); }
-.qvek-dialog[data-state='closed'] { animation: qvek-dialog-out 140ms ease-in; }
-.qvek-rise { animation: qvek-rise-in 220ms ease-out both; }
-
-@media (prefers-reduced-motion: reduce) {
-  .qvek-overlay, .qvek-dialog, .qvek-rise { animation: none; }
-}
+﻿/*
+ * Qvek Admin — global styles.
+ *
+ * The admin UI is a pixel-exact port of the `qvek-prototype` admin panel: it is built on its own reset
+ * (base.css) plus component classes (admin.css). Tailwind runs without its preflight so it cannot change
+ * heading sizes, button/img defaults or border colours; utilities remain available for new code.
+ */
+@import "../styles/tailwind.css";
+@import "../styles/base.css";
+@import "../styles/admin.css";

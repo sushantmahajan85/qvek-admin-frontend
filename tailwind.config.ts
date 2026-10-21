@@ -1,23 +1,30 @@
-/** @type {import('tailwindcss').Config} */
-export default {
+import type { Config } from 'tailwindcss';
+
+const config: Config = {
   darkMode: 'class',
-  content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}', './features/**/*.{ts,tsx}'],
+  content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}', './features/**/*.{ts,tsx}', './lib/**/*.{ts,tsx}'],
+  // The prototype's own reset (styles/base.css) is the baseline, so Tailwind's preflight stays off.
+  corePlugins: { preflight: false },
   theme: {
     extend: {
-      // All colors resolve to runtime CSS vars (lib/theme.ts) — rebranding later
-      // means editing ONE preset object, zero class changes.
+      // Qvek admin palette (CSS variables are defined on `body.admin` in styles/admin.css).
       colors: {
-        graphite: '#1C1C1C',
-        silver: '#9EA1A6',
-        cream: 'var(--qvek-bg)',
-        ink: 'var(--qvek-text)',
-        card: 'var(--qvek-card)',
-        edge: 'var(--qvek-border)',
-        softwhite: 'var(--qvek-text)',
-        muted2: 'var(--qvek-text-2)',
-        hover: 'var(--qvek-hover)',
+        bg: 'var(--bg)',
+        surface: 'var(--surface)',
+        'surface-2': 'var(--surface-2)',
+        'surface-3': 'var(--surface-3)',
+        primary: 'var(--primary)',
+        text: 'var(--text)',
+        'text-2': 'var(--text-2)',
+        'text-3': 'var(--text-3)',
+        border: 'var(--border)',
+        warning: 'var(--warning)',
+        error: 'var(--error)',
+        info: 'var(--info)',
       },
     },
   },
   plugins: [],
 };
+
+export default config;

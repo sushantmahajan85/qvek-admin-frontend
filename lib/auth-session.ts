@@ -8,6 +8,7 @@
 
 const ACCESS_KEY = 'qvek_admin_access';
 const REFRESH_KEY = 'qvek_admin_refresh';
+const USER_KEY = 'qvek_admin_user';
 
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
@@ -47,10 +48,28 @@ export function clearSession() {
   try {
     window.localStorage.removeItem(ACCESS_KEY);
     window.localStorage.removeItem(REFRESH_KEY);
+    window.localStorage.removeItem(USER_KEY);
   } catch {
     /* noop */
   }
   document.cookie = 'qvek_admin=; path=/; max-age=0; SameSite=Lax';
+}
+
+/** Username shown in the topbar profile menu (not a secret — the tokens above are). */
+export function setSessionUser(name: string) {
+  try {
+    window.localStorage.setItem(USER_KEY, name);
+  } catch {
+    /* noop */
+  }
+}
+
+export function getSessionUser(): string | null {
+  return read(USER_KEY);
+}
+
+export function hasSession(): boolean {
+  return !!getAccessToken() || !!getRefreshToken();
 }
 
 export function getAccessToken() {

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { apiGet, apiPost } from '@/lib/api-client';
+import { ApiError, apiGet, apiPost } from '@/lib/api-client';
 
 export interface KycDoc {
   key: string;
@@ -26,6 +26,17 @@ export const kycKeys = {
 
 export async function getKyc(riderId: string): Promise<KycData> {
   return apiGet<KycData>(`/admin/riders/${riderId}/kyc`);
+}
+
+/** 
+ull when the rider has no KYC on file yet (the API answers 404). */
+export async function getKycOrNull(riderId: string): Promise<KycData | null> {
+  try {
+    return await getKyc(riderId);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return null;
+    throw e;
+  }
 }
 
 export const kycSchema = z.object({

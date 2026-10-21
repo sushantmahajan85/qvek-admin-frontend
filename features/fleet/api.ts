@@ -9,6 +9,13 @@ export interface FleetRecovery {
   at: string | null;
 }
 
+export interface ComponentHistoryEntry {
+  component: 'chassisNo' | 'motorNo' | 'controllerNo' | string;
+  oldNo?: string | null;
+  newNo?: string | null;
+  at: string;
+}
+
 export interface FleetRow {
   id: string;
   vehicleNo: string;
@@ -17,6 +24,9 @@ export interface FleetRow {
   status: VehicleStatus;
   chassisNo?: string | null;
   motorNo?: string | null;
+  controllerNo?: string | null;
+  componentHistory?: ComponentHistoryEntry[] | null;
+  createdAt?: string;
   lat: number | null;
   lng: number | null;
   lastPingAt: string | null;
@@ -41,11 +51,15 @@ export interface Vehicle {
   status: VehicleStatus;
   chassisNo?: string | null;
   motorNo?: string | null;
+  controllerNo?: string | null;
 }
 
 export const vehicleSchema = z.object({
   vehicleNo: z.string().min(2).max(32),
   iopId: z.string().min(1).max(64),
+  chassisNo: z.string().min(2).max(64).optional(),
+  motorNo: z.string().min(1).max(64).optional(),
+  controllerNo: z.string().min(1).max(64).optional(),
 });
 export type VehicleInput = z.infer<typeof vehicleSchema>;
 
@@ -103,4 +117,33 @@ export interface ExpenseInput {
 
 export async function logExpense(input: ExpenseInput) {
   return apiPost('/admin/expenses', input);
+}
+
+export interface ReplacementRow {
+  id: string;
+  riderId: string;
+  oldVehicleId: string;
+  newVehicleId: string;
+  reason: string;
+  odometerOldKm?: number | null;
+  odometerNewKm?: number | null;
+  createdAt: string;
+}
+
+export async function listReplacements(): Promise<ReplacementRow[]> {
+  return apiGet<ReplacementRow[]>('/admin/replacements');
+}
+
+export interface ExpenseRow {
+  id: string;
+  riderId?: string | null;
+  vehicleId?: string | null;
+  kind: ExpenseInput['kind'];
+  amountPaise: number;
+  note?: string | null;
+  createdAt: string;
+}
+
+export async function listExpenses(): Promise<ExpenseRow[]> {
+  return apiGet<ExpenseRow[]>('/admin/expenses');
 }

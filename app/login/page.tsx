@@ -1,9 +1,8 @@
-import { LoginForm } from '@/features/auth/components';
+import type { Metadata } from 'next';
+import { LoginPage } from '@/components/qvek/login';
 
-export default function LoginPage() {
-  return (
-    <main className="flex min-h-screen items-center justify-center p-4">
-      <LoginForm />
-    </main>
-  );
+export const metadata: Metadata = { title: 'Sign in — Qvek Admin' };
+
+export default function Page() {
+  return <LoginPage />;
 }

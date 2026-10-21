@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '@/lib/api-client';
+import { apiGet, apiPut } from '@/lib/api-client';
 
 export interface SupportConfig {
   callNumber: string | null;
@@ -12,7 +12,7 @@ export async function getSupport(): Promise<SupportConfig> {
 }
 
 export async function setSupport(callNumber: string): Promise<SupportConfig> {
-  return apiPost<SupportConfig>('/config/support', { callNumber });
+  return apiPut<SupportConfig>('/config/support', { callNumber });
 }
 
 export function formatPaise(paise: number): string {

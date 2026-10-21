@@ -1,27 +1,63 @@
-import * as React from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
-import { cn } from '@/lib/utils';
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
 
-const badgeVariants = cva(
-  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
-  {
-    variants: {
-      tone: {
-        green: 'border-green-600/30 bg-green-500/10 text-green-700 dark:text-green-400',
-        amber: 'border-amber-600/30 bg-amber-500/10 text-amber-700 dark:text-amber-400',
-        red: 'border-red-600/30 bg-red-500/10 text-red-700 dark:text-red-400',
-        slate: 'border-edge bg-hover text-ink',
-        blue: 'border-blue-600/30 bg-blue-500/10 text-blue-700 dark:text-blue-400',
-      },
+import { Icon } from "@/components/qvek/icon";
+import { cn } from "@/lib/utils";
+
+/* shadcn-style Badge / Flag mapped onto the Qvek admin `.badge` + `.flag` classes. */
+const badgeVariants = cva("badge", {
+  variants: {
+    tone: {
+      green: "badge--green",
+      amber: "badge--amber",
+      red: "badge--red",
+      blue: "badge--blue",
+      violet: "badge--violet",
+      grey: "badge--grey",
+      outline: "badge--outline",
     },
-    defaultVariants: { tone: 'slate' },
   },
-);
+  defaultVariants: { tone: "grey" },
+});
 
-export function Badge({
-  className,
-  tone,
-  ...props
-}: React.HTMLAttributes<HTMLSpanElement> & VariantProps<typeof badgeVariants>) {
-  return <span className={cn(badgeVariants({ tone }), className)} {...props} />;
+type BadgeProps = Omit<React.ComponentProps<"span">, "children"> &
+  VariantProps<typeof badgeVariants> & {
+    /** Replaces the leading status dot with an icon. */
+    icon?: string | null;
+    children?: React.ReactNode;
+  };
+
+function Badge({ className, tone, icon, children, ...props }: BadgeProps) {
+  return (
+    <span data-slot="badge" className={cn(badgeVariants({ tone }), icon && "badge--noicon", className)} {...props}>
+      {icon ? <Icon name={icon} size={13} /> : null}
+      {children}
+    </span>
+  );
 }
+
+const flagVariants = cva("flag", {
+  variants: {
+    tone: {
+      amber: "",
+      red: "flag--red",
+      blue: "flag--blue",
+      grey: "flag--grey",
+    },
+  },
+  defaultVariants: { tone: "amber" },
+});
+
+type FlagProps = Omit<React.ComponentProps<"span">, "children"> &
+  VariantProps<typeof flagVariants> & { icon: string; children?: React.ReactNode };
+
+function Flag({ className, tone, icon, children, ...props }: FlagProps) {
+  return (
+    <span data-slot="flag" className={cn(flagVariants({ tone }), className)} {...props}>
+      <Icon name={icon} size={13} />
+      {children}
+    </span>
+  );
+}
+
+export { Badge, Flag, badgeVariants, flagVariants };

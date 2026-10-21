@@ -1,0 +1,4 @@
+﻿/* Tailwind layers only (no preflight — see tailwind.config.ts). Loaded BEFORE the prototype CSS so the
+   Qvek admin classes always win over utilities of equal specificity. */
+@tailwind components;
+@tailwind utilities;
