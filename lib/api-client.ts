@@ -57,7 +57,11 @@ async function request<T>(path: string, init?: RequestInit, retried = false): Pr
 }
 
 export const apiGet = <T>(path: string) => request<T>(path);
-export const apiPost = <T>(path: string, body?: unknown) =>
-  request<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined });
+export const apiPost = <T>(path: string, body?: unknown, extraHeaders?: Record<string, string>, method = 'POST') =>
+  request<T>(path, {
+    method,
+    body: body ? JSON.stringify(body) : undefined,
+    headers: extraHeaders,
+  });
 export const apiPatch = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined });

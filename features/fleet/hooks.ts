@@ -7,9 +7,12 @@ import { errorText } from '@/lib/error-map';
 import {
   assignVehicle,
   createVehicle,
+  disarmVehicle,
   getFleet,
+  getMap,
   listVehicles,
   logExpense,
+  reactivateVehicle,
   replaceVehicle,
   updateRecord,
   type AssignInput,
@@ -80,6 +83,32 @@ export function useReplaceVehicle() {
   });
 }
 
+export function useMap() {
+  return useQuery({ queryKey: ['map'], queryFn: getMap, refetchInterval: 30_000 });
+}
+
+export function useControlVehicle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, mode, reason }: { id: string; mode: 'disarm' | 'reactivate'; reason: string }) =>
+      mode === 'disarm' ? disarmVehicle(id, reason) : reactivateVehicle(id, reason),
+    onSuccess: (_, v) => {
+      qc.invalidateQueries({ queryKey: ['fleet'] });
+      qc.invalidateQueries({ queryKey: ['vehicles'] });
+      qc.invalidateQueries({ queryKey: ['map'] });
+      toast.success(v.mode === 'disarm' ? 'Vehicle immobilized' : 'Vehicle reactivated');
+    },
+    onError: (e) =>
+      toast.error(
+        errorText(
+          e instanceof ApiError ? e.code : undefined,
+          e instanceof ApiError && e.code === 'IOP_UNREACHABLE'
+            ? 'Relay unreachable — state unchanged'
+            : undefined,
+        ),
+      ),
+  });
+}
 export function useLogExpense(riderId?: string) {
   const qc = useQueryClient();
   return useMutation({

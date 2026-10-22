@@ -13,6 +13,9 @@ const MAP: Partial<Record<ErrorCode, string>> = {
   ACCOUNT_LOCKED: 'Locked after too many attempts — try again in 15 minutes.',
   UNAUTHENTICATED: 'Session expired — please log in again.',
   FORBIDDEN: 'You do not have permission for that action.',
+  THROTTLED: 'Too many attempts — wait a minute and retry.',
+  OTP_ATTEMPTS_EXCEEDED: 'Too many OTP tries — request a fresh code.',
+  INVALID_MFA: 'Wrong authenticator code — try again.',
   INTERNAL_ERROR: 'Something went wrong. Note the code and retry.',
 };
 

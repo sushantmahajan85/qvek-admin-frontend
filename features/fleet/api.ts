@@ -104,3 +104,32 @@ export interface ExpenseInput {
 export async function logExpense(input: ExpenseInput) {
   return apiPost('/admin/expenses', input);
 }
+
+export async function disarmVehicle(id: string, reason: string) {
+  return apiPost(`/admin/vehicles/${id}/disarm`, { reason });
+}
+
+export async function reactivateVehicle(id: string, reason: string) {
+  return apiPost(`/admin/vehicles/${id}/reactivate`, { reason });
+}
+
+export interface MapVehicle {
+  id: string;
+  vehicleNo: string;
+  status: string;
+  lat: number | null;
+  lng: number | null;
+  lastPingAt: string | null;
+  zone: 'operational' | 'warning' | 'disarm' | null;
+  color: string;
+}
+
+export interface MapData {
+  shop: { lat: number; lng: number } | null;
+  zones: { operationalKm: number; disarmKm: number };
+  vehicles: MapVehicle[];
+}
+
+export async function getMap(): Promise<MapData> {
+  return apiGet<MapData>('/admin/map');
+}

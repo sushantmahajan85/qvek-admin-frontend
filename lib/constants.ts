@@ -33,13 +33,13 @@ export const VEHICLE_STATUS_LABEL: Record<VehicleStatus, string> = {
   OFFLINE: 'Offline',
 };
 
-export const PLANS = ['WEEKLY', '2-WEEKLY', 'MONTHLY'] as const;
+export const PLANS = ['WEEKLY', '2-WEEKLY', '4-WEEKLY'] as const;
 export type PlanId = (typeof PLANS)[number];
 
 export const PLAN_LABEL: Record<PlanId, string> = {
   WEEKLY: 'Weekly',
   '2-WEEKLY': '2-Weekly',
-  MONTHLY: 'Monthly',
+  '4-WEEKLY': '4-Weekly',
 };
 
 export const TIMELINE_FILTERS = ['all', 'recharge', 'service'] as const;
@@ -70,6 +70,8 @@ export const ERROR_CODES = [
   'ACCOUNT_LOCKED',
   'UNAUTHENTICATED',
   'FORBIDDEN',
+  'THROTTLED',
+  'INVALID_MFA',
   'INTERNAL_ERROR',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];

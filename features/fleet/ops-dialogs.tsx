@@ -6,8 +6,61 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle, Di
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/input';
-import { useLogExpense, useReplaceVehicle, useUpdateRecord } from './hooks';
+import { useControlVehicle, useLogExpense, useReplaceVehicle, useUpdateRecord } from './hooks';
 import type { FleetRow } from './api';
+
+export function ControlDialog({
+  row,
+  mode,
+}: {
+  row: FleetRow;
+  mode: 'disarm' | 'reactivate';
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [reason, setReason] = React.useState('');
+  const { mutate, isPending } = useControlVehicle();
+  const valid = reason.trim().length >= 3;
+  const disarm = mode === 'disarm';
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant={disarm ? 'destructive' : 'default'} size="sm">
+          {disarm ? 'Immobilize' : 'Unlock'}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogTitle>
+          {disarm ? 'Immobilize' : 'Unlock'} {row.vehicleNo}?
+        </DialogTitle>
+        <DialogDescription>
+          {disarm
+            ? 'Cuts the scooter relay via GPS. The rider is notified.'
+            : 'Reactivates the scooter relay via GPS.'}{' '}
+          Relay confirms first — on failure nothing changes.
+        </DialogDescription>
+        <Textarea
+          placeholder="Reason — min 3 chars, stored in audit log"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
+        <DialogFooter>
+          <Button
+            variant={disarm ? 'destructive' : 'default'}
+            disabled={!valid || isPending}
+            onClick={() =>
+              mutate(
+                { id: row.id, mode, reason: reason.trim() },
+                { onSuccess: () => setOpen(false) },
+              )
+            }
+          >
+            {isPending ? 'Sending…' : disarm ? 'Immobilize' : 'Unlock'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export function RecordDialog({ row }: { row: FleetRow }) {
   const [open, setOpen] = React.useState(false);

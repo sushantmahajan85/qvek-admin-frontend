@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { TD, TH, THead, TR, RowActions, Table } from '@/components/ui/table';
 import { VEHICLE_STATUS_LABEL } from '@/lib/constants';
 import { RiderStatusBadge } from '@/features/riders/badge';
+import { ControlDialog } from './ops-dialogs';
 import type { FleetRow } from './api';
 
 const TONE: Record<string, 'green' | 'amber' | 'red' | 'slate' | 'blue'> = {
@@ -59,6 +60,7 @@ export function FleetTable({ rows }: { rows: FleetRow[] }) {
           <TH>Plan valid till</TH>
           <TH>Last GPS</TH>
           <TH>Recovery</TH>
+          <TH>Control</TH>
         </TR>
       </THead>
       <tbody>
@@ -101,6 +103,15 @@ export function FleetTable({ rows }: { rows: FleetRow[] }) {
             <TD>
               <RecoveryCell row={r} />
             </TD>
+            <TD>
+              <RowActions>
+                {r.status === 'IMMOBILIZED' ? (
+                  <ControlDialog row={r} mode="reactivate" />
+                ) : (
+                  <ControlDialog row={r} mode="disarm" />
+                )}
+              </RowActions>
+            </TD>
           </TR>
         ))}
       </tbody>
@@ -111,7 +122,7 @@ export function FleetTable({ rows }: { rows: FleetRow[] }) {
 export function DisarmNote() {
   return (
     <p className="text-xs text-muted2">
-      Manual immobilize / unlock arrives with Phase 5 IOP integration — statuses above are display-only for now.
+      Immobilize cuts the GPS relay after confirmation; Unlock reactivates it. Failures leave state unchanged.
     </p>
   );
 }

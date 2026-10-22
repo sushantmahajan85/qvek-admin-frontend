@@ -4,11 +4,14 @@ import * as React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  Bell,
   Bike,
   ChevronsUpDown,
   LayoutDashboard,
   LogOut,
+  Map as MapIcon,
   Menu,
+  ScrollText,
   Settings,
   Truck,
   Users,
@@ -38,12 +41,17 @@ const GROUPS: Array<{ label: string; items: NavItem[] }> = [
     items: [
       { href: '/riders', label: 'Riders', icon: Users, badge: 'pending' },
       { href: '/fleet', label: 'Fleet', icon: Truck },
+      { href: '/map', label: 'Map', icon: MapIcon },
+      { href: '/alerts', label: 'Alerts', icon: Bell },
       { href: '/vehicles', label: 'Vehicles', icon: Bike },
     ],
   },
   {
     label: 'System',
-    items: [{ href: '/settings', label: 'Settings', icon: Settings }],
+    items: [
+      { href: '/audit-logs', label: 'Audit log', icon: ScrollText },
+      { href: '/settings', label: 'Settings', icon: Settings },
+    ],
   },
 ];
 
@@ -51,7 +59,10 @@ const TITLES: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/riders': 'Riders',
   '/fleet': 'Fleet',
+  '/map': 'Map',
+  '/alerts': 'Alerts',
   '/vehicles': 'Vehicles',
+  '/audit-logs': 'Audit log',
   '/settings': 'Settings',
 };
 
