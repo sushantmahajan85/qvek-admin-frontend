@@ -33,6 +33,7 @@ export function emptyState(): State {
     version: 1,
     clock: { base: 0, setAt: 0 },
     config: U.clone(DEFAULT_CONFIG),
+    hub: null,
     riders: [],
     vehicles: [],
     finance: [],

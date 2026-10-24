@@ -161,7 +161,10 @@ function mapKyc(status: RiderStatus, k: KycData | null | undefined): { kyc: Kyc;
 export function buildState(inp: LiveInputs): State {
   const s = emptyState();
   const { now, sim } = inp;
-  const hub = inp.hub ?? { lat: 0, lng: 0 };
+  // Configured hub only — no median fallback (a phantom hub lies about
+  // distances). Null hub: pins still render from lat/lng; distances unknown.
+  const hub = inp.hub ?? null;
+  s.hub = hub;
 
   /* ---- config ------------------------------------------------------ */
   s.config = {
@@ -334,7 +337,7 @@ export function buildState(inp: LiveInputs): State {
       online: row.status !== 'OFFLINE',
       lastGps,
       lastMoved: row.idle ? Math.min(lastGps, now - 73 * HOUR) : lastGps,
-      pos: hasGps ? toPos(row.lat as number, row.lng as number, hub) : { x: 0, y: 0 },
+      pos: hasGps && hub ? toPos(row.lat as number, row.lng as number, hub) : { x: 0, y: 0 },
       lat: row.lat,
       lng: row.lng,
       hasGps,

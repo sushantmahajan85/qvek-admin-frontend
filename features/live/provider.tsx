@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { useSupport } from '@/features/config/hooks';
-import { useExpenses, useFleet, useReplacements } from '@/features/fleet/hooks';
+import { useAdminMap, useExpenses, useFleet, useReplacements } from '@/features/fleet/hooks';
 import { getKycOrNull, kycKeys } from '@/features/kyc/api';
 import { useRiders } from '@/features/riders/hooks';
 import { getTimeline } from '@/features/timeline/api';
@@ -12,7 +12,7 @@ import { store } from '@/lib/qvek/store';
 import { StoreVersionContext } from '@/lib/qvek/use-store';
 import { getSessionUser } from '@/lib/auth-session';
 import { kycRequests } from './requests';
-import { buildState, resolveHub } from './map-state';
+import { buildState } from './map-state';
 
 const REFRESH_MS = 60_000;
 
@@ -27,6 +27,7 @@ export function LiveDataProvider({ children }: { children: React.ReactNode }) {
   const replacements = useReplacements();
   const expenses = useExpenses();
   const support = useSupport();
+  const adminMap = useAdminMap();
 
   const simVersion = React.useSyncExternalStore(sim.subscribe, () => sim.version, () => 0);
   const kycVersion = React.useSyncExternalStore(kycRequests.subscribe, kycRequests.getVersion, () => 0);
@@ -64,6 +65,7 @@ export function LiveDataProvider({ children }: { children: React.ReactNode }) {
     replacements.dataUpdatedAt,
     expenses.dataUpdatedAt,
     support.dataUpdatedAt,
+    adminMap.dataUpdatedAt,
     simVersion,
     timelineQs.map((q) => q.dataUpdatedAt).join(','),
     kycQs.map((q) => q.dataUpdatedAt).join(','),
@@ -79,6 +81,9 @@ export function LiveDataProvider({ children }: { children: React.ReactNode }) {
       if (kycQs[i]?.isSuccess) kyc[id] = kycQs[i].data;
     });
     const fleetRows = fleet.data ?? [];
+    // Configured hub only (backend shop). Null = unset: UI shows distances
+    // as unknown instead of measuring from a phantom hub.
+    const hub = adminMap.data?.shop ?? null;
     return buildState({
       fleet: fleetRows,
       riders: riderList,
@@ -88,7 +93,7 @@ export function LiveDataProvider({ children }: { children: React.ReactNode }) {
       expenses: expenses.data ?? [],
       support: support.data,
       username: getSessionUser() ?? 'admin',
-      hub: resolveHub(fleetRows),
+      hub,
       now: Date.now(),
       sim: sim.data,
     });

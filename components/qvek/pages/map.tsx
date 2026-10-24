@@ -59,7 +59,11 @@ function MapSide() {
         <div className="card__body" style={{ display: "grid", gap: 12 }}>
           <div className="badge-row">
             <Badge tone={tone}>{KIND_LABEL[k]}</Badge>
-            <Badge tone={ZONE_BADGE[zz][0]}>{ZONE_BADGE[zz][1]}</Badge>
+            {s.hub ? (
+              <Badge tone={ZONE_BADGE[zz][0]}>{ZONE_BADGE[zz][1]}</Badge>
+            ) : (
+              <Badge tone="grey">Hub not set</Badge>
+            )}
             {D.isIdle(v) ? <Flag tone="amber" icon="clock">Idle 72h+</Flag> : null}
           </div>
           {zz === "warning" ? (
@@ -80,7 +84,7 @@ function MapSide() {
             <dt>Rider</dt>
             <dd>{r ? r.name + " · " + r.customerId : "Unassigned"}</dd>
             <dt>Distance</dt>
-            <dd>{U.dist(v.pos).toFixed(1)} km from hub</dd>
+            <dd>{s.hub ? `${U.dist(v.pos).toFixed(1)} km from hub` : "Hub not set — configure in Settings"}</dd>
             <dt>Position</dt>
             <dd>{locText(v)}</dd>
             <dt>Last GPS update</dt>

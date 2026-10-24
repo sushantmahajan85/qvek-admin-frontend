@@ -304,6 +304,8 @@ export interface State {
   version: 1;
   clock: { base: number; setAt: number };
   config: Config;
+  /** Configured hub (backend shop). Null = unset: distances/zones unknown. */
+  hub: { lat: number; lng: number } | null;
   riders: Rider[];
   vehicles: Vehicle[];
   finance: FinanceEntry[];
