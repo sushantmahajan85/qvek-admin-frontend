@@ -29,6 +29,7 @@ import {
   VFlags,
 } from "../bits";
 import { Icon } from "../icon";
+import { FleetGpsHealth } from "../fleet-gps-health";
 import { useUI } from "../ui-context";
 import { useAutoRefresh } from "../use-auto-refresh";
 
@@ -341,6 +342,7 @@ export function DashboardPage() {
         {stat("recovery", "Marked for recovery", c.recovery, "pin", "tone-violet", "Share location link")}
         {stat("idle", "Idle 72h+", c.idle, "clock", "tone-amber", "Warehouse excluded")}
       </div>
+      <FleetGpsHealth />
       <section className="card">
         <div className="toolbar">
           <SearchBox value={d.q} onChange={(q) => setD({ q, page: 1 })} placeholder="Search rider name, phone, Customer ID, vehicle no. or chassis no." />

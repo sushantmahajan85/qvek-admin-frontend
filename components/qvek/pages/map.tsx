@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import dynamic from "next/dynamic";
+import { useMemo, useState } from "react";
 
 import { Badge, Flag } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getPageState, patchPageState, usePageState } from "@/lib/qvek/page-state";
+import { usePageState } from "@/lib/qvek/page-state";
 import { KIND_LABEL, ZC, ZONE_BADGE, locText, vKind, type VKind } from "@/lib/qvek/selectors";
 import { D, G, store } from "@/lib/qvek/store";
 import { U } from "@/lib/qvek/utils";
@@ -13,21 +14,21 @@ import { useStore } from "@/lib/qvek/use-store";
 import { useAdmin } from "../admin-context";
 import { ControlButton, EmptyState, Plate } from "../bits";
 import { Icon } from "../icon";
-import { HubMark, MapBase, MapZones, Marker } from "../map-parts";
 import { useAutoRefresh } from "../use-auto-refresh";
 
+const FleetLeafletMap = dynamic(
+  () => import("../fleet-leaflet-map").then((m) => m.FleetLeafletMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="map-stage" style={{ display: "grid", placeItems: "center" }}>
+        <span className="spinner" />
+      </div>
+    ),
+  },
+);
+
 const KINDS: ("all" | VKind)[] = ["all", "active", "grace", "immobilized", "repair", "offline", "available", "recovery"];
-
-const viewBoxOf = (m: { zoom: number; cx: number; cy: number }) => {
-  const w = 760 / m.zoom;
-  const h = 600 / m.zoom;
-  return (m.cx - w / 2).toFixed(1) + " " + (m.cy - h / 2).toFixed(1) + " " + w.toFixed(1) + " " + h.toFixed(1);
-};
-
-function zoomMap(f: number) {
-  const m = getPageState("map");
-  patchPageState("map", { zoom: Math.max(0.8, Math.min(14, m.zoom * f)) });
-}
 
 function MapSide() {
   const admin = useAdmin();
@@ -163,60 +164,15 @@ export function MapPage() {
   useStore();
   useAutoRefresh();
   const [m, setM] = usePageState("map");
-  const stageRef = useRef<HTMLDivElement>(null);
-  const focusId = useRef<string | null>(null);
-  const [dragging, setDragging] = useState(false);
-  const drag = useRef<{ x: number; y: number; cx: number; cy: number; w: number } | null>(null);
   const s = store.state;
 
   const n = (k: "all" | VKind) => (k === "all" ? s.vehicles.length : s.vehicles.filter((v) => vKind(v) === k).length);
   const vs = s.vehicles.filter((v) => m.filter === "all" || vKind(v) === m.filter);
   const sel = vs.find((v) => v.id === m.sel);
+  const visibleIds = useMemo(() => new Set(vs.map((v) => v.id)), [vs]);
 
   const select = (id: string) => {
-    focusId.current = id || null;
     setM({ sel: id || null });
-  };
-
-  // After a marker is chosen, keep keyboard focus on it (the prototype re-rendered then focused it).
-  useEffect(() => {
-    if (!focusId.current) return;
-    const mk = document.querySelector<SVGGElement>('.marker[data-id="' + focusId.current + '"]');
-    mk?.focus({ preventScroll: true });
-    focusId.current = null;
-  });
-
-  // Wheel zoom needs a non-passive listener so the page does not scroll.
-  useEffect(() => {
-    const stage = stageRef.current;
-    if (!stage) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      zoomMap(e.deltaY < 0 ? 1.25 : 0.8);
-    };
-    stage.addEventListener("wheel", onWheel, { passive: false });
-    return () => stage.removeEventListener("wheel", onWheel);
-  }, []);
-
-  const onDown = (e: PointerEvent<HTMLDivElement>) => {
-    const t = e.target as HTMLElement;
-    if (t.closest(".marker") || t.closest("button")) return;
-    const svg = document.getElementById("fleet-map");
-    if (!svg) return;
-    const cur = getPageState("map");
-    drag.current = { x: e.clientX, y: e.clientY, cx: cur.cx, cy: cur.cy, w: svg.clientWidth };
-    setDragging(true);
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-  const onMove = (e: PointerEvent<HTMLDivElement>) => {
-    const d = drag.current;
-    if (!d) return;
-    const scale = 760 / getPageState("map").zoom / d.w;
-    patchPageState("map", { cx: d.cx - (e.clientX - d.x) * scale, cy: d.cy - (e.clientY - d.y) * scale });
-  };
-  const onUp = () => {
-    drag.current = null;
-    setDragging(false);
   };
 
   return (
@@ -252,50 +208,18 @@ export function MapPage() {
               ))}
             </div>
           </div>
-          <div
-            className="map-stage"
-            id="map-stage"
-            ref={stageRef}
-            onPointerDown={onDown}
-            onPointerMove={onMove}
-            onPointerUp={onUp}
-            onPointerCancel={onUp}
-          >
-            <div id="map-svg-wrap" style={{ width: "100%", height: "100%" }}>
-              <svg
-                id="fleet-map"
-                className={dragging ? "dragging" : undefined}
-                viewBox={viewBoxOf(m)}
-                role="application"
-                aria-label={"Fleet map with " + vs.length + " vehicles. Use the zoom buttons or drag to pan."}
-              >
-                <MapBase />
-                <MapZones labels />
-                <HubMark />
-                {vs.filter((v) => v !== sel).map((v) => (
-                  <Marker key={v.id} v={v} selected={false} onSelect={select} />
-                ))}
-                {sel ? <Marker v={sel} selected onSelect={select} /> : null}
-              </svg>
-            </div>
+          <FleetLeafletMap
+            visibleIds={visibleIds}
+            selectedId={sel?.id ?? null}
+            onSelect={select}
+          />
             <span className="map-banner">
               <Icon name="info" size={13} />
-              Last known GPS positions
+              Last known GPS positions · OpenStreetMap
+              {vs.some((v) => !v.hasGps) ? (
+                <> · {vs.filter((v) => !v.hasGps).length} without signal ({vs.filter((v) => !v.hasGps).map((v) => v.regNo).join(", ")})</>
+              ) : null}
             </span>
-            <div className="map-ctrls">
-              <button type="button" aria-label="Zoom in" onClick={() => zoomMap(1.4)}>
-                <Icon name="plus" size={16} />
-              </button>
-              <button type="button" aria-label="Zoom out" onClick={() => zoomMap(1 / 1.4)}>
-                <Icon name="minus" size={16} />
-              </button>
-              <button type="button" aria-label="Zoom to hub warehouse" onClick={() => setM({ zoom: 9, cx: 0, cy: 0 })}>
-                <Icon name="warehouse" size={16} />
-              </button>
-              <button type="button" aria-label="Reset view" onClick={() => setM({ zoom: 1, cx: 0, cy: 0 })}>
-                <Icon name="crosshair" size={16} />
-              </button>
-            </div>
             <div className="map-legend">
               <div className="map-legend__row">
                 {(Object.keys(KIND_LABEL) as VKind[]).map((k) => (
@@ -319,7 +243,6 @@ export function MapPage() {
                 </span>
               </div>
             </div>
-          </div>
         </section>
         <div id="map-side">
           <MapSide />

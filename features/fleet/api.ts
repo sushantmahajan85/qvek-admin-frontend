@@ -147,3 +147,104 @@ export interface ExpenseRow {
 export async function listExpenses(): Promise<ExpenseRow[]> {
   return apiGet<ExpenseRow[]>('/admin/expenses');
 }
+
+// ---- Phase D: GPS fleet ops (backend: IotService) ----
+
+export interface FleetHealth {
+  byStatus: Record<string, number>;
+  vendor: { staticNum: number; moveNum: number; offlineNum: number; unusedNum: number } | null;
+  simExpiring: { id: string; vehicleNo: string; simEndTime: string | null; status: string }[];
+  stale: { id: string; vehicleNo: string; lastPingAt: string | null; status: string }[];
+}
+
+export async function getFleetHealth(): Promise<FleetHealth> {
+  return apiGet<FleetHealth>('/admin/fleet/health');
+}
+
+export interface LiveFix {
+  lat: number;
+  lng: number;
+  at: string;
+  online: boolean;
+}
+
+export interface VehicleLive {
+  vehicle: { id: string; vehicleNo: string; status: string; riderId: string | null };
+  fix: LiveFix | null;
+}
+
+export async function getVehicleLive(id: string): Promise<VehicleLive> {
+  return apiGet<VehicleLive>(`/admin/vehicles/${id}/live`);
+}
+
+export interface TrackPoint {
+  lng: string;
+  lat: string;
+  speed?: number;
+  gpsTime: number;
+}
+
+export interface StayPoint {
+  lng?: string;
+  lat?: string;
+  startTime?: number;
+  endTime?: number;
+  duration?: number;
+}
+
+export interface VehicleTrack {
+  vehicleNo: string;
+  from: string;
+  to: string;
+  points: TrackPoint[];
+  stays: StayPoint[];
+}
+
+export async function getVehicleTrack(id: string, from: string, to: string): Promise<VehicleTrack> {
+  return apiGet<VehicleTrack>(`/admin/vehicles/${id}/track?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+}
+
+export interface VehicleOdometer {
+  vehicleNo: string;
+  runTime: number;
+  miles: number;
+}
+
+export async function getVehicleOdometer(id: string, from: string, to: string): Promise<VehicleOdometer> {
+  return apiGet<VehicleOdometer>(`/admin/vehicles/${id}/odometer?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+}
+
+export async function renewVehicleSim(id: string): Promise<{ id: string; renewed: boolean }> {
+  return apiPost<{ id: string; renewed: boolean }>(`/admin/vehicles/${id}/sim-renew`);
+}
+
+export interface Reconcile {
+  unknown: { imei: string; deviceName?: string }[];
+  missing: { id: string; vehicleNo: string; iopId: string }[];
+  counts: { vendor: number; local: number };
+}
+
+export async function getReconcile(): Promise<Reconcile> {
+  return apiGet<Reconcile>('/admin/fleet/reconcile');
+}
+
+export interface MapVehicle {
+  id: string;
+  vehicleNo: string;
+  status: string;
+  lat: number | null;
+  lng: number | null;
+  lastPingAt: string | null;
+  zone: 'operational' | 'warning' | 'disarm' | null;
+  color: string;
+}
+
+export interface AdminMap {
+  shop: { lat: number; lng: number } | null;
+  zones: { operationalKm: number; disarmKm: number };
+  vehicles: MapVehicle[];
+}
+
+export async function getAdminMap(): Promise<AdminMap> {
+  return apiGet<AdminMap>('/admin/map');
+}

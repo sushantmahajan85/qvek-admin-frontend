@@ -7,11 +7,18 @@ import { errorText } from '@/lib/error-map';
 import {
   assignVehicle,
   createVehicle,
+  getAdminMap,
   getFleet,
+  getFleetHealth,
+  getReconcile,
+  getVehicleLive,
+  getVehicleOdometer,
+  getVehicleTrack,
   listExpenses,
   listReplacements,
   listVehicles,
   logExpense,
+  renewVehicleSim,
   replaceVehicle,
   updateRecord,
   type AssignInput,
@@ -103,4 +110,55 @@ export function useLogExpense() {
     },
     onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
   });
+}
+
+// ---- Phase D: GPS fleet ops ----
+
+export function useFleetHealth() {
+  return useQuery({ queryKey: ['fleet-health'], queryFn: getFleetHealth, refetchInterval: 60_000 });
+}
+
+export function useVehicleLive(vehicleId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['vehicle-live', vehicleId],
+    queryFn: () => getVehicleLive(vehicleId),
+    enabled,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useVehicleTrack(vehicleId: string, from: string, to: string, enabled = false) {
+  return useQuery({
+    queryKey: ['vehicle-track', vehicleId, from, to],
+    queryFn: () => getVehicleTrack(vehicleId, from, to),
+    enabled,
+  });
+}
+
+export function useVehicleOdometer(vehicleId: string, from: string, to: string, enabled = true) {
+  return useQuery({
+    queryKey: ['vehicle-odometer', vehicleId, from, to],
+    queryFn: () => getVehicleOdometer(vehicleId, from, to),
+    enabled,
+  });
+}
+
+export function useSimRenew() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vehicleId: string) => renewVehicleSim(vehicleId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fleet-health'] });
+      toast.success('SIM renewal sent to vendor');
+    },
+    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+  });
+}
+
+export function useReconcile(enabled = false) {
+  return useQuery({ queryKey: ['fleet-reconcile'], queryFn: getReconcile, enabled });
+}
+
+export function useAdminMap() {
+  return useQuery({ queryKey: ['admin-map'], queryFn: getAdminMap, refetchInterval: 60_000 });
 }

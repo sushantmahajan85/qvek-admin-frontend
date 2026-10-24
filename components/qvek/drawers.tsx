@@ -17,6 +17,7 @@ import { AssetBadge, ControlButton, FinFilterSeg, FinRow, Plate, PlanStateBadge,
 import { DOC_TITLES, DocSvg } from "./doc-svg";
 import { Icon } from "./icon";
 import { MiniMap } from "./map-parts";
+import { VehicleGpsSection } from "./vehicle-gps";
 
 const HICON: Record<HistoryType, [string, string]> = {
   created: ["sparkle", "tone-grey"],
@@ -162,6 +163,8 @@ export function VehicleDrawerBody({ v, fin, onFin }: { v: Vehicle; fin: string; 
         </dl>
         <p className="field__hint" style={{ marginTop: 8 }}>Last known IOP GPS position, shown relative to the hub.</p>
       </div>
+
+      <VehicleGpsSection vehicleId={v.id} />
 
       <div className="dsec">
         <h3>

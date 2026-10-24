@@ -14,7 +14,7 @@ import { useAdmin } from "../admin-context";
 import { AssetBadge, ControlButton, EmptyState, FieldError, LogRow, Plate, SearchBox } from "../bits";
 import { Icon } from "../icon";
 import { MiniMap } from "../map-parts";
-import { useSetSupport } from "@/features/config/hooks";
+import { useSetSupport, useSetZones, useZones } from "@/features/config/hooks";
 import { useSetupMfa } from "@/features/auth/hooks";
 import { mockCaptureEnabled } from "@/features/payments/hooks";
 import { useAutoRefresh } from "../use-auto-refresh";
@@ -475,6 +475,80 @@ function SupportCard() {
   );
 }
 
+function ZonesCard() {
+  const zones = useZones();
+  const save = useSetZones();
+  const z = zones.data;
+  const [lat, setLat] = useState(z?.shopLat != null ? String(z.shopLat) : "");
+  const [lng, setLng] = useState(z?.shopLng != null ? String(z.shopLng) : "");
+  const [warn, setWarn] = useState(z ? String(z.warningKm) : "15");
+  const [disarm, setDisarm] = useState(z ? String(z.disarmKm) : "25");
+  const [err, setErr] = useState<string | null>(null);
+
+  const submit = () => {
+    const shopLat = lat.trim() === "" ? null : Number(lat);
+    const shopLng = lng.trim() === "" ? null : Number(lng);
+    const warningKm = Number(warn);
+    const disarmKm = Number(disarm);
+    if ((lat.trim() !== "" && !Number.isFinite(shopLat)) || (lng.trim() !== "" && !Number.isFinite(shopLng))) {
+      setErr("Hub coordinates must be numbers (e.g. 12.9716, 77.5946), or blank to unset.");
+      return;
+    }
+    if (!Number.isFinite(warningKm) || warningKm < 1 || !Number.isFinite(disarmKm) || disarmKm < 1) {
+      setErr("Distances must be at least 1 km.");
+      return;
+    }
+    if (disarmKm <= warningKm) {
+      setErr("Disarm distance must be larger than the warning distance.");
+      return;
+    }
+    setErr(null);
+    save.mutate({ shopLat, shopLng, warningKm, disarmKm });
+  };
+
+  return (
+    <section className="card">
+      <div className="card__head">
+        <h2>
+          <Icon name="pin" size={16} />
+          Service zones &amp; hub
+        </h2>
+        {zones.isError ? <Badge tone="amber">Unavailable</Badge> : null}
+      </div>
+      <form className="card__body" noValidate onSubmit={(e) => { e.preventDefault(); submit(); }}>
+        <div className="form-grid">
+          <div className="field">
+            <label htmlFor="zone-lat">Hub latitude</label>
+            <input className="input" id="zone-lat" inputMode="decimal" placeholder="12.9716" value={lat} onChange={(e) => setLat(e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="zone-lng">Hub longitude</label>
+            <input className="input" id="zone-lng" inputMode="decimal" placeholder="77.5946" value={lng} onChange={(e) => setLng(e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="zone-warn">Warning distance (km)</label>
+            <input className="input" id="zone-warn" inputMode="decimal" value={warn} onChange={(e) => setWarn(e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="zone-disarm">Disarm distance (km)</label>
+            <input className="input" id="zone-disarm" inputMode="decimal" value={disarm} onChange={(e) => setDisarm(e.target.value)} />
+          </div>
+        </div>
+        <p className="field__hint" style={{ marginTop: 10 }}>
+          Warning alerts past the first circle; scooters stop past the second. Device fences redraw within ~15 min. Leave hub blank to disable distance checks.
+        </p>
+        {err ? <FieldError>{err}</FieldError> : null}
+      </form>
+      <div className="card__foot">
+        <Button variant="primary" disabled={save.isPending || zones.isLoading} onClick={submit}>
+          <Icon name="check" size={16} />
+          {save.isPending ? "Saving…" : "Save zones"}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 function MfaCard() {
   const setup = useSetupMfa();
   const [url, setUrl] = useState<string | null>(null);
@@ -549,6 +623,7 @@ export function SettingsPage() {
         <div className="stack">
           <SupportCard key={supportKey} />
           <PricingCard />
+          <ZonesCard />
         </div>
         <div className="stack">
           <MfaCard />
