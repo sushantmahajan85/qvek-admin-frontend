@@ -154,7 +154,7 @@ function mapKyc(status: RiderStatus, k: KycData | null | undefined): { kyc: Kyc;
   return {
     kyc: { aadhaar: doc(k.aadhaar), pan: doc(k.pan), dl: doc(k.dlNo) },
     loaded: true,
-    info: { fullName: k.fullName, aadhaar: k.aadhaar, pan: k.pan, dlNo: k.dlNo, verified: k.verified, docs: (k.docs ?? []).map((d) => ({ key: d.key, url: d.url })) },
+    info: { fullName: k.fullName, aadhaar: k.aadhaar, pan: k.pan, dlNo: k.dlNo, verified: k.verified, docs: (k.docs ?? []).map((d) => ({ key: d.key, kind: d.kind, name: d.name ?? null, url: d.url })) },
   };
 }
 
@@ -246,6 +246,7 @@ export function buildState(inp: LiveInputs): State {
       const at = ms(e.ts);
       finance.push({
         id: `${r.id}:${at}:${i}`,
+        paymentId: e.paymentId ?? null,
         ref: `TL-${r.id.slice(-4).toUpperCase()}-${at.toString(36).toUpperCase().slice(-5)}`,
         riderId: r.id,
         vehicleId: null,

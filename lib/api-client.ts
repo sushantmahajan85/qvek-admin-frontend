@@ -1,6 +1,6 @@
 import { clearSession, getAccessToken, getRefreshToken, setSession } from './auth-session';
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1';
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1';
 
 export class ApiError extends Error {
   code: string;

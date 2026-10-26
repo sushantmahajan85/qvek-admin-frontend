@@ -5,7 +5,7 @@ import { toast } from '@/lib/toast';
 import { ApiError } from '@/lib/api-client';
 import { errorText } from '@/lib/error-map';
 import type { RiderStatus } from '@/lib/constants';
-import { approveRider, createRider, getRider, listRiders, rejectRider, riderKeys, transitionRider } from './api';
+import { approveRider, createRider, getRider, listRiders, rejectRider, riderKeys, transitionRider, updateRider, type UpdateRiderInput } from './api';
 
 export function useRiders(q: string) {
   return useQuery({ queryKey: riderKeys.list(q), queryFn: () => listRiders(q) });
@@ -52,6 +52,19 @@ export function useCreateRider() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: riderKeys.all });
       toast.success('Rider added — approve after KYC + deposit');
+    },
+    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+  });
+}
+
+export function useUpdateRider(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateRiderInput) => updateRider(id, input),
+    onSuccess: () => {
+      invalidate(qc, id);
+      qc.invalidateQueries({ queryKey: ['fleet'] });
+      toast.success('Rider details updated');
     },
     onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
   });

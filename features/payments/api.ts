@@ -16,3 +16,7 @@ export async function getPayments(riderId: string): Promise<AdminPayment[]> {
 export async function mockCapture(paymentId: string) {
   return apiPost(`/admin/payments/${paymentId}/mock-capture`);
 }
+
+export async function verifyPayment(paymentId: string, reason: string) {
+  return apiPost(`/admin/payments/${paymentId}/verify`, { reason });
+}

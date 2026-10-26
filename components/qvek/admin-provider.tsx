@@ -14,6 +14,7 @@ import { patchPageState } from "@/lib/qvek/page-state";
 import { G, store } from "@/lib/qvek/store";
 import { useStore } from "@/lib/qvek/use-store";
 import { transitionRider } from "@/features/riders/api";
+import { reactivateVehicle } from "@/features/fleet/api";
 import { AdminContext, type AdminApi } from "./admin-context";
 import { AssetBadge, VFlags } from "./bits";
 import { Drawer } from "./drawer";
@@ -52,6 +53,32 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [drawer, setDrawer] = useState<DrawerState | null>(null);
   const seq = useRef(0);
 
+  // Idle auto-logout (30 min): shared admin terminal safety. Silent — no
+  // confirm, since the operator is by definition away.
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | null = null;
+    const kick = () => {
+      if (t) clearTimeout(t);
+      t = setTimeout(() => {
+        try {
+          if (!document.cookie.includes('qvek_admin=1')) return;
+        } catch {
+          return;
+        }
+        signOut();
+        qc.clear();
+        router.replace('/login');
+      }, 30 * 60 * 1000);
+    };
+    kick();
+    const evts = ['pointerdown', 'keydown', 'scroll', 'touchstart'] as const;
+    evts.forEach((e) => window.addEventListener(e, kick, { passive: true }));
+    return () => {
+      if (t) clearTimeout(t);
+      evts.forEach((e) => window.removeEventListener(e, kick));
+    };
+  }, [qc, router]);
+
   const closeDrawer = useCallback(() => {
     setDrawer((d) => (d && !d.closing ? { ...d, closing: true } : d));
     setTimeout(() => setDrawer((d) => (d && d.closing ? null : d)), reduceMotion() ? 0 : 260);
@@ -89,7 +116,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         const v = G.vehicle(rc.vehicleId)!;
         const cfg = {
           agentCalled: ["Agent reached the scooter?", "Confirm the recovery agent is with " + v.regNo + " and has called you.", "Confirm", "phone"],
-          unlocked: ["Unlock " + v.regNo + "?", "The scooter will be marked as unlocked so the agent can ride it back to the facility. This is simulated until the backend supports unlock commands.", "Unlock scooter", "unlock"],
+          unlocked: ["Unlock " + v.regNo + "?", "The scooter will be reactivated via the IOP relay so the agent can ride it back to the facility.", "Unlock scooter", "unlock"],
           returned: ["Mark as returned to facility?", v.regNo + " will be unlinked from the rider (rider status → Returned) and the recovery closed.", "Close recovery", "warehouse"],
         }[step];
         const ok = await ui.confirm({ title: cfg[0], body: <p>{cfg[1]}</p>, confirmLabel: cfg[2], kind: "primary", icon: cfg[3] });
@@ -108,8 +135,22 @@ export function AdminProvider({ children }: { children: ReactNode }) {
           ui.toast("Recovery closed — " + v.regNo + " returned", { title: "Recovery updated" });
           return;
         }
+        if (step === "unlocked") {
+          // Real: reactivate via the IOP relay; relay failures keep the state and the step open.
+          try {
+            await reactivateVehicle(v.id, "Recovery — agent on site");
+          } catch (e) {
+            toast.error(errorText(e instanceof ApiError ? e.code : undefined));
+            return;
+          }
+          await Promise.all([
+            qc.invalidateQueries({ queryKey: ["fleet"] }),
+            qc.invalidateQueries({ queryKey: ["admin-map"] }),
+            qc.invalidateQueries({ queryKey: ["audit-logs"] }),
+          ]);
+        }
         simRecoveryStep(rc, v, step);
-        ui.toast(step === "agentCalled" ? "Agent call recorded" : v.regNo + " unlocked", { title: step === "unlocked" ? "Simulated — no IOP command endpoint yet" : "Recovery updated", type: step === "unlocked" ? "info" : "success" });
+        ui.toast(step === "agentCalled" ? "Agent call recorded" : v.regNo + " unlocked via tracker relay", { title: "Recovery updated" });
       },
       manualRecovery: () => void ui.open(<ManualRecoveryFlow />),
 

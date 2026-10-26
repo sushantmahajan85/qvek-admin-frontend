@@ -385,8 +385,11 @@ button.stat:hover { border-color: var(--border-2); background: var(--surface-2);
 .doc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .doc { border: 1px solid var(--border); border-radius: 12px; background: var(--input); overflow: hidden; text-align: left; display: flex; flex-direction: column; transition: border-color .15s; }
 button.doc:hover { border-color: var(--border-2); }
-.doc__thumb { aspect-ratio: 1.58; background: #0A1424; display: grid; place-items: center; border-bottom: 1px solid var(--border); color: var(--text-3); }
+.doc__thumb { aspect-ratio: 1.58; background: #0A1424; display: grid; place-items: center; border-bottom: 1px solid var(--border); color: var(--text-3); overflow: hidden; }
 .doc__thumb > svg:not(.ic) { width: 100%; height: 100%; }
+.doc__thumb img { width: 100%; height: 100%; object-fit: cover; }
+.doc-full { border-radius: 12px; overflow: hidden; border: 1px solid var(--border); background: #0A1424; }
+.doc-full img { display: block; width: 100%; max-height: 62vh; object-fit: contain; }
 .doc__meta { padding: 8px 10px; display: grid; gap: 4px; }
 .doc__meta b { font-size: 12.5px; }
 .doc__meta small { font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -11,13 +11,30 @@ import { U } from "@/lib/qvek/utils";
 import { useStore } from "@/lib/qvek/use-store";
 import type { RecoveryStep } from "@/lib/qvek/types";
 import { useAdmin } from "../admin-context";
-import { AssetBadge, ControlButton, EmptyState, FieldError, LogRow, Plate, SearchBox } from "../bits";
+import { AssetBadge, ControlButton, EmptyState, LogRow, Plate, SearchBox } from "../bits";
 import { Icon } from "../icon";
+import { PricingCard, SupportCard, ZonesCard } from "../settings-cards";
 import { MiniMap } from "../map-parts";
-import { useSetSupport, useSetZones, useZones } from "@/features/config/hooks";
 import { useSetupMfa } from "@/features/auth/hooks";
 import { mockCaptureEnabled } from "@/features/payments/hooks";
+import { useAuditLogs, usePollFleet, useReconcile } from "@/features/fleet/hooks";
+import { useAlerts } from "@/features/alerts/hooks";
 import { useAutoRefresh } from "../use-auto-refresh";
+
+const ALERT_TONE: Record<string, "red" | "green" | "amber" | "blue" | "violet" | "grey"> = {
+  VEHICLE_DISARMED: "red",
+  SOS: "red",
+  VEHICLE_REACTIVATED: "green",
+  GEOFENCE_WARNING: "amber",
+  TAMPER: "amber",
+  OVERSPEED: "amber",
+  LOW_BATTERY: "amber",
+  PAYMENT_RECEIVED: "blue",
+  RENTAL_EXPIRING: "blue",
+  GRACE_ENDING: "blue",
+  RECOVERY: "violet",
+  VEHICLE_OFFLINE: "grey",
+};
 
 /* ---------------------------------------------------------------- Recovery */
 const STEPS: [RecoveryStep, string, string][] = [
@@ -88,7 +105,7 @@ export function RecoveryPage() {
                       <MiniMap v={v} />
                     </div>
                     <p className="cell-sub" style={{ marginTop: 6, whiteSpace: "normal" }}>
-                      {locText(v)} · last GPS {U.fmtDateTime(v.lastGps)} (mock)
+                      {locText(v)} · last GPS {U.fmtDateTime(v.lastGps)}
                     </p>
                   </div>
                   <div>
@@ -222,6 +239,10 @@ export function ControlsPage() {
   useStore();
   useAutoRefresh();
   const [st, setSt] = usePageState("controls");
+  const poll = usePollFleet();
+  const reconcile = useReconcile(false);
+  const audits = useAuditLogs("vehicle", 30);
+  const alerts = useAlerts(30);
   const s = store.state;
 
   const vs = s.vehicles.filter((v) => (v.riderId || v.immobilized) && matchVehicle(v, st.q)).sort((a, b) => Number(b.immobilized) - Number(a.immobilized));
@@ -234,13 +255,39 @@ export function ControlsPage() {
           <h1>Vehicle controls</h1>
           <p>Immobilize or unlock vehicles. Automatic actions come from the backend rules; manual actions need confirmation and are logged.</p>
         </div>
+        <div className="page-head__actions">
+          <Button variant="subtle" disabled={poll.isPending} onClick={() => poll.mutate()}>
+            <Icon name="refresh" size={15} />
+            {poll.isPending ? "Polling trackers…" : "Poll trackers now"}
+          </Button>
+          <Button variant="subtle" disabled={reconcile.isFetching} onClick={() => reconcile.refetch()}>
+            <Icon name="activity" size={15} />
+            {reconcile.isFetching ? "Checking…" : "Reconcile vendor"}
+          </Button>
+        </div>
       </div>
       <div className="notice notice--info" style={{ marginBottom: 16 }}>
         <Icon name="info" size={16} />
         <span>
-          <b>Simulated for now.</b> The backend has no immobilize / unlock endpoint yet, so these actions are recorded in this browser only. Real commands will go through the backend and the IOP GPS API — the browser never controls a vehicle directly.
+          Commands go through the backend to the IOP GPS relay — the browser never controls a vehicle directly. The vehicle flips state only after the relay confirms; relay failures (IOP_UNREACHABLE) leave the state unchanged.
         </span>
       </div>
+      {reconcile.data ? (
+        <div className="notice notice--warn" style={{ marginBottom: 16 }}>
+          <Icon name="alert" size={16} />
+          <span>
+            Vendor reconcile: {reconcile.data.counts.vendor} on vendor · {reconcile.data.counts.local} local
+            {reconcile.data.unknown.length ? ` · ${reconcile.data.unknown.length} unknown IMEIs` : ""}
+            {reconcile.data.missing.length ? ` · ${reconcile.data.missing.length} missing on vendor` : " · in sync"}
+          </span>
+        </div>
+      ) : null}
+      {reconcile.isError ? (
+        <div className="notice notice--warn" style={{ marginBottom: 16 }}>
+          <Icon name="alert" size={16} />
+          <span>Vendor reconcile unavailable (live GPS only). Local fleet data still applies.</span>
+        </div>
+      ) : null}
       <section className="card" style={{ marginBottom: 16 }}>
         <div className="card__head">
           <h2>
@@ -379,173 +426,87 @@ export function ControlsPage() {
           </div>
           <div className="card__body" id="ctl-log" style={{ maxHeight: 520, overflowY: "auto" }}>
             {logs.length ? <div className="tl">{logs.slice(0, 30).map((l) => <LogRow key={l.id} l={l} />)}</div> : <EmptyState icon="activity" title="No activity" text="Control actions appear here." />}
+            {audits.data?.length ? (
+              <div style={{ marginTop: 16 }}>
+                <p className="field__label" style={{ marginBottom: 8 }}>Server audit — vehicle</p>
+                <div className="tl">
+                  {audits.data.slice(0, 15).map((a) => (
+                    <div className="tl-row" key={a.id}>
+                      <span className="tl-dot tone-grey">
+                        <Icon name="activity" size={15} />
+                      </span>
+                      <div>
+                        <b>{a.action}</b>
+                        <p>{a.reason || a.entityId}</p>
+                        <time>{U.fmtDateTime(new Date(a.createdAt).getTime())} · {a.actorId}</time>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : audits.isError ? (
+              <p className="cell-sub" style={{ marginTop: 12 }}>Server audit unavailable.</p>
+            ) : audits.isLoading ? (
+              <p className="cell-sub" style={{ marginTop: 12 }}>Reading server audit…</p>
+            ) : null}
           </div>
         </section>
       </div>
+      <section className="card" style={{ marginTop: 16 }}>
+        <div className="card__head">
+          <h2>
+            <Icon name="bell" size={16} />
+            Tracker &amp; vendor alerts
+          </h2>
+          <button type="button" className="link" onClick={() => alerts.refetch()}>
+            Refresh
+          </button>
+        </div>
+        <div className="card__body" style={{ maxHeight: 380, overflowY: "auto" }}>
+          {alerts.isLoading ? (
+            <p className="cell-sub">Reading alerts…</p>
+          ) : alerts.isError ? (
+            <EmptyState
+              icon="bell"
+              title="Alerts unavailable"
+              text="Could not reach the alert feed."
+              action={
+                <Button size="sm" onClick={() => alerts.refetch()}>
+                  <Icon name="refresh" size={15} />
+                  Retry
+                </Button>
+              }
+            />
+          ) : !alerts.data?.length ? (
+            <EmptyState icon="bell" title="No alerts" text="Geofence, offline, SOS and immobilize events from the tracker vendor appear here." />
+          ) : (
+            <div className="tl">
+              {alerts.data.slice(0, 30).map((a) => {
+                const v = a.vehicleId ? G.vehicle(a.vehicleId) : undefined;
+                const r = a.riderId ? G.rider(a.riderId) : undefined;
+                return (
+                  <div className="tl-row" key={a.id}>
+                    <span className="tl-dot tone-grey">
+                      <Icon name="bell" size={15} />
+                    </span>
+                    <div>
+                      <b>
+                        <Badge tone={ALERT_TONE[a.kind] ?? "grey"}>{a.kind}</Badge>{" "}
+                        {a.title}
+                      </b>
+                      <p>
+                        {[v ? v.regNo : null, r ? r.name : null, a.body].filter(Boolean).join(" · ") || "—"}
+                      </p>
+                      <time>{U.fmtDateTime(new Date(a.createdAt).getTime())}</time>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
     </>
-  );
-}
-
-/* ---------------------------------------------------------------- Settings */
-function PricingCard() {
-  const c = store.state.config;
-  return (
-    <section className="card">
-      <div className="card__head">
-        <h2>
-          <Icon name="zap" size={16} />
-          Rental plans &amp; pricing
-        </h2>
-        <Badge tone="blue">Set by the server</Badge>
-      </div>
-      <form className="card__body" id="price-form" noValidate onSubmit={(e) => e.preventDefault()}>
-        <div className="form-grid">
-          {c.plans.map((p) => (
-            <div className="field" key={p.id}>
-              <label htmlFor={"pl-" + p.id}>
-                {p.name} ({p.weeks * 7} days)
-              </label>
-              <div className="input-prefix">
-                <span>₹</span>
-                <input id={"pl-" + p.id} type="number" value={p.price} readOnly />
-              </div>
-            </div>
-          ))}
-          <div className="field">
-            <label htmlFor="pl-deposit">Security deposit</label>
-            <div className="input-prefix">
-              <span>₹</span>
-              <input id="pl-deposit" type="number" value={c.deposit} readOnly />
-            </div>
-          </div>
-        </div>
-        <p className="field__hint" style={{ marginTop: 12 }}>
-          All plans run Tuesday to Tuesday. Prices and the deposit are configured on the server (WEEKLY_RENT_PAISE and plan config) and are read-only here.
-        </p>
-      </form>
-    </section>
-  );
-}
-
-function SupportCard() {
-  const c = store.state.config;
-  const save = useSetSupport();
-  const [call, setCall] = useState(c.support.call);
-  const [err, setErr] = useState(false);
-
-  const submit = () => {
-    const v = call.trim();
-    if (v.length < 10 || v.length > 16) {
-      setErr(true);
-      return;
-    }
-    setErr(false);
-    save.mutate(v);
-  };
-
-  return (
-    <section className="card">
-      <div className="card__head">
-        <h2>
-          <Icon name="headset" size={16} />
-          Support contact (Rider app)
-        </h2>
-      </div>
-      <form className="card__body" id="support-form" noValidate onSubmit={(e) => { e.preventDefault(); submit(); }}>
-        <div className="form-grid">
-          <div className="field">
-            <label htmlFor="sp-call">Call number</label>
-            <input className="input" id="sp-call" inputMode="tel" maxLength={16} placeholder="+91XXXXXXXXXX" value={call} onChange={(e) => setCall(e.target.value)} />
-          </div>
-          <div className="field">
-            <label htmlFor="sp-wa">WhatsApp number</label>
-            <input className="input" id="sp-wa" value={c.support.whatsapp || "Not configured"} readOnly />
-          </div>
-        </div>
-        <p className="field__hint" style={{ marginTop: 10 }}>Shown on the rider app&apos;s Contact Admin buttons. Weekly rent is set on the server.</p>
-        {err ? <FieldError>Enter a number with 10–16 characters (e.g. +91XXXXXXXXXX).</FieldError> : null}
-      </form>
-      <div className="card__foot">
-        <Button variant="primary" disabled={save.isPending} onClick={submit}>
-          <Icon name="check" size={16} />
-          {save.isPending ? "Saving…" : "Save contact"}
-        </Button>
-      </div>
-    </section>
-  );
-}
-
-function ZonesCard() {
-  const zones = useZones();
-  const save = useSetZones();
-  const z = zones.data;
-  const [lat, setLat] = useState(z?.shopLat != null ? String(z.shopLat) : "");
-  const [lng, setLng] = useState(z?.shopLng != null ? String(z.shopLng) : "");
-  const [warn, setWarn] = useState(z ? String(z.warningKm) : "15");
-  const [disarm, setDisarm] = useState(z ? String(z.disarmKm) : "25");
-  const [err, setErr] = useState<string | null>(null);
-
-  const submit = () => {
-    const shopLat = lat.trim() === "" ? null : Number(lat);
-    const shopLng = lng.trim() === "" ? null : Number(lng);
-    const warningKm = Number(warn);
-    const disarmKm = Number(disarm);
-    if ((lat.trim() !== "" && !Number.isFinite(shopLat)) || (lng.trim() !== "" && !Number.isFinite(shopLng))) {
-      setErr("Hub coordinates must be numbers (e.g. 12.9716, 77.5946), or blank to unset.");
-      return;
-    }
-    if (!Number.isFinite(warningKm) || warningKm < 1 || !Number.isFinite(disarmKm) || disarmKm < 1) {
-      setErr("Distances must be at least 1 km.");
-      return;
-    }
-    if (disarmKm <= warningKm) {
-      setErr("Disarm distance must be larger than the warning distance.");
-      return;
-    }
-    setErr(null);
-    save.mutate({ shopLat, shopLng, warningKm, disarmKm });
-  };
-
-  return (
-    <section className="card">
-      <div className="card__head">
-        <h2>
-          <Icon name="pin" size={16} />
-          Service zones &amp; hub
-        </h2>
-        {zones.isError ? <Badge tone="amber">Unavailable</Badge> : null}
-      </div>
-      <form className="card__body" noValidate onSubmit={(e) => { e.preventDefault(); submit(); }}>
-        <div className="form-grid">
-          <div className="field">
-            <label htmlFor="zone-lat">Hub latitude</label>
-            <input className="input" id="zone-lat" inputMode="decimal" placeholder="12.9716" value={lat} onChange={(e) => setLat(e.target.value)} />
-          </div>
-          <div className="field">
-            <label htmlFor="zone-lng">Hub longitude</label>
-            <input className="input" id="zone-lng" inputMode="decimal" placeholder="77.5946" value={lng} onChange={(e) => setLng(e.target.value)} />
-          </div>
-          <div className="field">
-            <label htmlFor="zone-warn">Warning distance (km)</label>
-            <input className="input" id="zone-warn" inputMode="decimal" value={warn} onChange={(e) => setWarn(e.target.value)} />
-          </div>
-          <div className="field">
-            <label htmlFor="zone-disarm">Disarm distance (km)</label>
-            <input className="input" id="zone-disarm" inputMode="decimal" value={disarm} onChange={(e) => setDisarm(e.target.value)} />
-          </div>
-        </div>
-        <p className="field__hint" style={{ marginTop: 10 }}>
-          Warning alerts past the first circle; scooters stop past the second. Device fences redraw within ~15 min. Leave hub blank to disable distance checks.
-        </p>
-        {err ? <FieldError>{err}</FieldError> : null}
-      </form>
-      <div className="card__foot">
-        <Button variant="primary" disabled={save.isPending || zones.isLoading} onClick={submit}>
-          <Icon name="check" size={16} />
-          {save.isPending ? "Saving…" : "Save zones"}
-        </Button>
-      </div>
-    </section>
   );
 }
 

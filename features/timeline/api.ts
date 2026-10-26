@@ -2,6 +2,7 @@ import { apiGet } from '@/lib/api-client';
 import type { TimelineFilter } from '@/lib/constants';
 
 export interface TimelineEntry {
+  paymentId?: string | null;
   ts: string;
   kind: string;
   amountPaise: number;

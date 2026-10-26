@@ -5,6 +5,7 @@ export interface SupportConfig {
   whatsappNumber: string | null;
   weeklyRentPaise: number;
   plans: Record<string, number>;
+  depositPaise: number;
 }
 
 export async function getSupport(): Promise<SupportConfig> {
@@ -42,4 +43,15 @@ export interface ZonesInput {
 
 export async function setZones(input: ZonesInput): Promise<ZonesConfig> {
   return apiPut<ZonesConfig>('/config/zones', input);
+}
+
+export interface PricingInput {
+  weeklyPaise?: number;
+  fortnightlyPaise?: number;
+  fourWeeklyPaise?: number;
+  depositPaise?: number;
+}
+
+export async function setPricing(input: PricingInput): Promise<SupportConfig> {
+  return apiPut<SupportConfig>('/config/pricing', input);
 }

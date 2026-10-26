@@ -95,7 +95,7 @@ export function VehicleDrawerBody({ v, fin, onFin }: { v: Vehicle; fin: string; 
             </Button>
           ) : null}
         </div>
-        <p className="field__hint" style={{ marginTop: 10 }}>Simulated — the backend has no immobilize / unlock command yet.</p>
+        <p className="field__hint" style={{ marginTop: 10 }}>Sent through the backend to the IOP GPS relay — the vehicle flips state only after the relay confirms.</p>
       </div>
 
       <div className="dsec">
@@ -214,11 +214,13 @@ export function VehicleDrawerBody({ v, fin, onFin }: { v: Vehicle; fin: string; 
 
 export function DocTiles({ r }: { r: Rider }) {
   const admin = useAdmin();
+  const fileFor = (k: KycKey) => r.kycInfo?.docs.find((d) => d.kind === k) ?? null;
   return (
     <div className="doc-grid">
       {(["aadhaar", "pan", "dl"] as KycKey[]).map((k) => {
         const d = r.kyc[k] || { status: "missing" as const };
-        if (d.status === "missing") {
+        const file = fileFor(k);
+        if (d.status === "missing" && !file) {
           return (
             <div key={k} className="doc doc--missing">
               <div className="doc__thumb"><Icon name="file" size={26} /></div>
@@ -231,10 +233,20 @@ export function DocTiles({ r }: { r: Rider }) {
         }
         return (
           <button key={k} type="button" className="doc" onClick={() => admin.viewDoc(r.id, k)}>
-            <div className="doc__thumb">{d.sample ? <DocSvg kind={k} name={r.name} phone={r.phone} /> : <Icon name="image" size={26} />}</div>
+            <div className="doc__thumb">
+              {file ? (
+                // Real uploaded file; the signed URL loads the thumbnail itself.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={file.url} alt={DOC_TITLES[k]} loading="lazy" />
+              ) : d.sample ? (
+                <DocSvg kind={k} name={r.name} phone={r.phone} />
+              ) : (
+                <Icon name="image" size={26} />
+              )}
+            </div>
             <div className="doc__meta">
               <b>{DOC_TITLES[k]}</b>
-              <small>{d.file}</small>
+              <small>{file?.name ?? d.file ?? "Uploaded"}</small>
               {d.status === "verified" ? <Badge tone="green">Verified</Badge> : <Badge tone="amber">Submitted</Badge>}
             </div>
           </button>

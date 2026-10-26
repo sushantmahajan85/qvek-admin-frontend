@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '@/lib/api-client';
+import { apiGet, apiPatch, apiPost } from '@/lib/api-client';
 import type { RiderStatus } from '@/lib/constants';
 
 export interface Rider {
@@ -53,6 +53,17 @@ export async function createRider(input: CreateRiderInput): Promise<Rider> {
 
 export async function rejectRider(id: string, reason: string): Promise<Rider> {
   return apiPost<Rider>(`/admin/riders/${id}/reject`, { reason });
+}
+
+export interface UpdateRiderInput {
+  name?: string;
+  phone?: string;
+  age?: number;
+  platform?: string;
+}
+
+export async function updateRider(id: string, input: UpdateRiderInput): Promise<Rider> {
+  return apiPatch<Rider>(`/admin/riders/${id}`, input);
 }
 
 export async function transitionRider(id: string, status: RiderStatus, reason: string): Promise<Rider> {

@@ -20,6 +20,15 @@ const MAP: Partial<Record<ErrorCode, string>> = {
   ACCOUNT_LOCKED: 'Locked after too many attempts — try again in 15 minutes.',
   UNAUTHENTICATED: 'Session expired — please log in again.',
   FORBIDDEN: 'You do not have permission for that action.',
+  IOP_UNREACHABLE: 'Tracker relay unreachable — vehicle state unchanged. Retry in a minute.',
+  NO_TRACKER: 'This vehicle has no tracker bound.',
+  INVALID_ZONES: 'Disarm radius must exceed warning radius.',
+  INVALID_PRICING: 'Pricing values are invalid.',
+  BAD_RANGE: 'Invalid date window.',
+  RANGE_TOO_WIDE: 'Date window too wide (max 31 days).',
+  NO_CHANGES: 'No changes to save.',
+  INVALID_PHONE: 'Enter a valid 10-digit mobile number.',
+  PAYMENT_NOT_FOUND: 'Payment not found.',
   INTERNAL_ERROR: 'Something went wrong. Note the code and retry.',
 };
 

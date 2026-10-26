@@ -103,7 +103,7 @@ export interface Rider {
     pan: string | null;
     dlNo: string | null;
     verified: boolean;
-    docs: { key: string; url: string }[];
+    docs: { key: string; kind: string; name: string | null; url: string }[];
   } | null;
 }
 
@@ -177,6 +177,7 @@ export type FinStatus = "success" | "pending" | "failed";
 
 export interface FinanceEntry {
   id: string;
+  paymentId?: string | null;
   ref: string;
   riderId: string;
   vehicleId: string | null;

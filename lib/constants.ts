@@ -78,6 +78,15 @@ export const ERROR_CODES = [
   'ACCOUNT_LOCKED',
   'UNAUTHENTICATED',
   'FORBIDDEN',
+  'IOP_UNREACHABLE',
+  'NO_TRACKER',
+  'INVALID_ZONES',
+  'INVALID_PRICING',
+  'BAD_RANGE',
+  'RANGE_TOO_WIDE',
+  'NO_CHANGES',
+  'INVALID_PHONE',
+  'PAYMENT_NOT_FOUND',
   'INTERNAL_ERROR',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];

@@ -10,13 +10,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { useUpdateRecord, useCreateVehicle } from "@/features/fleet/hooks";
+import { useUpdateRecord, useCreateVehicle, useDisarmVehicle, useReactivateVehicle } from "@/features/fleet/hooks";
 import { useUpsertKyc } from "@/features/kyc/hooks";
+import { useVerifyPayment } from "@/features/payments/hooks";
 import { kycSchema } from "@/features/kyc/api";
 import { ASSET_TO_API } from "@/features/live/map-state";
-import { simControl, simRiderEdit, simVehicleStatus } from "@/features/live/sim-actions";
+import { simVehicleStatus } from "@/features/live/sim-actions";
 import { riderKeys } from "@/features/riders/api";
-import { useApproveRider, useCreateRider, useRejectRider, useTransitionRider } from "@/features/riders/hooks";
+import { useApproveRider, useCreateRider, useRejectRider, useTransitionRider, useUpdateRider } from "@/features/riders/hooks";
 import { STATUS_DESC, FIN_STATUS } from "@/lib/qvek/selectors";
 import { D, G, L, store } from "@/lib/qvek/store";
 import type { AssetStatus, KycKey, Rider, Vehicle } from "@/lib/qvek/types";
@@ -27,18 +28,17 @@ import { Icon } from "./icon";
 import { Modal } from "./modal";
 import { useUI } from "./ui-context";
 
-const wait = (ms: number) => new Promise((res) => setTimeout(res, ms));
-
-/* ---------------------------------------------------------------- immobilize / unlock (simulated) */
+/* ---------------------------------------------------------------- immobilize / unlock (real API) */
 export function ControlFlow({ id, op }: { id: string; op: "immobilize" | "reactivate" }) {
-  const ui = useUI();
+  const disarm = useDisarmVehicle();
+  const reactivate = useReactivateVehicle();
+  const busy = disarm.isPending || reactivate.isPending;
   const v = G.vehicle(id)!;
   const r = G.vehicleRider(v);
   const im = op === "immobilize";
   const [sel, setSel] = useState("");
   const [other, setOther] = useState("");
   const [err, setErr] = useState(false);
-  const [sending, setSending] = useState(false);
   const otherRef = useRef<HTMLInputElement>(null);
   const reasons = im ? ["Recovery in progress", "Suspected misuse", "Rider request", "Safety check"] : ["Recovery — agent on site", "Issue resolved", "Rider back in operational zone", "Payment verified manually"];
 
@@ -59,28 +59,28 @@ export function ControlFlow({ id, op }: { id: string; op: "immobilize" | "reacti
           label: im ? "Immobilize" : "Unlock",
           kind: im ? "danger" : "primary",
           icon: im ? "lock" : "unlock",
-          busy: sending ? "Sending…" : undefined,
+          busy: busy ? "Sending to tracker…" : undefined,
           onClick: async () => {
             const reason = sel === "other" ? other.trim() : sel;
             if (!reason) {
               setErr(true);
               return false;
             }
-            setSending(true);
-            await wait(500);
-            const ok = simControl(v, op, reason);
-            if (ok) ui.toast(v.regNo + (im ? " immobilized" : " unlocked") + " · logged in this browser", { title: "Simulated — no IOP command endpoint yet", type: "info" });
-            else ui.toast("Vehicle was already " + (im ? "immobilized" : "running") + ".", { type: "warning" });
-            return true;
+            try {
+              if (im) await disarm.mutateAsync({ id: v.id, reason });
+              else await reactivate.mutateAsync({ id: v.id, reason });
+            } catch {
+              return false;
+            }
           },
         },
       ]}
     >
       {im ? (
-        <p>The scooter will be marked immobilized. The rider is not notified automatically yet.</p>
+        <p>The scooter will be immobilized via the IOP relay. The rider is not notified automatically yet.</p>
       ) : (
         <p>
-          The scooter will be marked as running.{" "}
+          The scooter will be reactivated via the IOP relay.{" "}
           {v.immobilizedReason === "plan_expiry" && r && !(r.plan && r.plan.end > D.now()) ? (
             <>
               <b>Note:</b> the rider’s plan is not valid.
@@ -119,7 +119,7 @@ export function ControlFlow({ id, op }: { id: string; op: "immobilize" | "reacti
         />
         {err ? <FieldError>Select or enter a reason.</FieldError> : null}
       </div>
-      <p className="field__hint" style={{ marginTop: 10 }}>Simulated — the backend has no immobilize / unlock command yet, so this is recorded in this browser only.</p>
+      <p className="field__hint" style={{ marginTop: 10 }}>Sent through the backend to the IOP GPS relay. The vehicle flips state only after the relay confirms; failures keep the current state.</p>
     </Modal>
   );
 }
@@ -479,28 +479,48 @@ export function AddVehicleFlow() {
 export function DocPreviewFlow({ riderId, docKey }: { riderId: string; docKey: KycKey }) {
   const r = G.rider(riderId)!;
   const d = r.kyc[docKey];
-  const files = r.kycInfo?.docs ?? [];
+  const file = r.kycInfo?.docs.find((x) => x.kind === docKey) ?? null;
+  const name = file?.name ?? "";
+  const isPdf = /\.pdf$/i.test(name) || /\.pdf$/i.test(file?.key ?? "");
   return (
     <Modal
       title={DOC_TITLES[docKey] + " — " + r.name}
-      subtitle={(d.file || "") + " · " + (d.status === "verified" ? "Verified" : "Submitted " + U.fmtDate(d.at))}
-      size="md"
+      subtitle={(d.file || name || "") + " · " + (d.status === "verified" ? "Verified" : "Submitted " + U.fmtDate(d.at))}
+      size="lg"
       icon="idCard"
-      actions={[{ label: "Close", kind: "ghost" }]}
+      actions={[
+        ...(file
+          ? [{ label: "Open full document", kind: "primary" as const, onClick: () => { window.open(file.url, "_blank", "noopener"); } }]
+          : []),
+        { label: "Close", kind: "ghost" },
+      ]}
     >
-      <div className="empty">
-        <span className="empty__icon"><Icon name="image" size={24} /></span>
-        <b>{d.file}</b>
-        <p>Only the last 4 digits of the number are stored — full numbers never persist.{files.length ? " Open the uploaded files from the KYC section." : ""}</p>
-      </div>
+      {file && !isPdf ? (
+        <div className="doc-full">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={file.url} alt={DOC_TITLES[docKey]} />
+        </div>
+      ) : file ? (
+        <div className="empty">
+          <span className="empty__icon"><Icon name="file" size={24} /></span>
+          <b>{name || d.file}</b>
+          <p>PDF preview isn&apos;t embedded — open the full document to review it, then verify from the KYC section.</p>
+        </div>
+      ) : (
+        <div className="empty">
+          <span className="empty__icon"><Icon name="image" size={24} /></span>
+          <b>{d.file}</b>
+          <p>Only the last 4 digits of the number are stored — full numbers never persist.</p>
+        </div>
+      )}
     </Modal>
   );
 }
 
-/* ---------------------------------------------------------------- edit rider details (simulated) */
+/* ---------------------------------------------------------------- edit rider details (real) */
 export function EditRiderFlow({ id }: { id: string }) {
-  const ui = useUI();
   const r = G.rider(id)!;
+  const save = useUpdateRider(id);
   const known = L.platforms.includes(r.platform);
   const [name, setName] = useState(r.name);
   const [phone, setPhone] = useState(r.phone);
@@ -526,7 +546,8 @@ export function EditRiderFlow({ id }: { id: string }) {
           label: "Save changes",
           kind: "primary",
           icon: "check",
-          onClick: () => {
+          busy: save.isPending ? "Saving…" : undefined,
+          onClick: async () => {
             const nm = name.trim().replace(/\s+/g, " ");
             const ph = phone.trim().replace(/\D/g, "");
             const ag = Number(age.trim());
@@ -541,18 +562,21 @@ export function EditRiderFlow({ id }: { id: string }) {
             if (!e.phone && dupe) e.phone = "This mobile number is already registered to " + dupe.name + ".";
             setErrs(e);
             if (Object.keys(e).length) return false;
-            const changed: string[] = [];
             const patch: { name?: string; phone?: string; age?: number; platform?: string } = {};
-            if (nm !== r.name) { patch.name = nm; changed.push("name (" + r.name + " → " + nm + ")"); }
-            if (ph !== r.phone) { patch.phone = ph; changed.push("mobile number"); }
-            if (ag !== r.age) { patch.age = ag; changed.push("age (" + r.age + " → " + ag + ")"); }
-            if (pf !== r.platform) { patch.platform = pf; changed.push("work platform (" + r.platform + " → " + pf + ")"); }
-            if (!changed.length) {
+            if (nm !== r.name) patch.name = nm;
+            if (ph !== r.phone) patch.phone = ph;
+            if (ag !== r.age) patch.age = ag;
+            if (pf !== r.platform) patch.platform = pf;
+            if (!Object.keys(patch).length) {
               setErrs({ name: "No changes to save." });
               return false;
             }
-            simRiderEdit(id, patch, "Details updated: " + changed.join(", "));
-            ui.toast("Updated " + changed.length + " field" + (changed.length === 1 ? "" : "s") + " for " + nm + ".", { title: "Simulated — saved in this browser only", type: "info" });
+            try {
+              // The hook toasts success / the server's error code (features/riders/hooks.ts).
+              await save.mutateAsync(patch);
+            } catch {
+              return false;
+            }
           },
         },
       ]}
@@ -611,7 +635,7 @@ export function EditRiderFlow({ id }: { id: string }) {
             {err("other")}
           </div>
         </div>
-        <p className="field__hint" style={{ marginTop: 12 }}>Simulated — the backend has no rider-edit endpoint yet, so changes are kept in this browser only.</p>
+        <p className="field__hint" style={{ marginTop: 12 }}>Changes are saved to the rider record and audited.</p>
       </form>
     </Modal>
   );
@@ -797,6 +821,10 @@ export function FinDetailFlow({ id, onOpenRider }: { id: string; onOpenRider: (r
   const r = G.rider(e.riderId);
   const v = G.vehicle(e.vehicleId);
   const fs = FIN_STATUS[e.status];
+  const verify = useVerifyPayment();
+  const [reason, setReason] = useState("");
+  const [reasonErr, setReasonErr] = useState(false);
+  const canVerify = e.status === "pending" && !!e.paymentId;
   return (
     <Modal
       title={e.title}
@@ -805,6 +833,29 @@ export function FinDetailFlow({ id, onOpenRider }: { id: string; onOpenRider: (r
       size="sm"
       actions={[
         ...(r ? [{ label: "Open rider", kind: "ghost" as const, onClick: () => { setTimeout(() => onOpenRider(r.id), 50); } }] : []),
+        ...(canVerify
+          ? [
+              {
+                label: "Mark verified",
+                kind: "primary" as const,
+                icon: "check" as const,
+                busy: verify.isPending ? "Verifying…" : undefined,
+                onClick: async () => {
+                  const rs = reason.trim();
+                  if (rs.length < 3) {
+                    setReasonErr(true);
+                    return false;
+                  }
+                  try {
+                    // The hook toasts success / the server's error code (features/payments/hooks.ts).
+                    await verify.mutateAsync({ paymentId: e.paymentId as string, reason: rs });
+                  } catch {
+                    return false;
+                  }
+                },
+              },
+            ]
+          : []),
         { label: "Close", kind: "primary" as const },
       ]}
     >
@@ -846,6 +897,31 @@ export function FinDetailFlow({ id, onOpenRider }: { id: string; onOpenRider: (r
       {e.type === "recharge" || e.type === "first_cycle" ? (
         <p className="field__hint" style={{ marginTop: 12 }}>UPI recharges are verified by the backend before the plan is extended.</p>
       ) : null}
+      {e.status === "pending" ? (
+        e.paymentId ? (
+          <div className="field" style={{ marginTop: 14 }}>
+            <label htmlFor="fin-verify-reason">
+              Verify manually <span className="req">*</span>
+            </label>
+            <input
+              className="input"
+              id="fin-verify-reason"
+              placeholder="e.g. UPI credited, webhook never arrived"
+              value={reason}
+              onChange={(ev) => {
+                setReason(ev.target.value);
+                setReasonErr(false);
+              }}
+            />
+            {reasonErr ? <FieldError>Enter why you are verifying (at least 3 characters) — recorded in the audit log.</FieldError> : null}
+            <p className="field__hint" style={{ marginTop: 8 }}>
+              Only use this when the money actually arrived but the gateway webhook was lost. It runs the same capture path as the webhook (extends the rental, reactivates after grace) and is audited with your name.
+            </p>
+          </div>
+        ) : (
+          <p className="field__hint" style={{ marginTop: 12 }}>Only gateway payments can be verified here.</p>
+        )
+      ) : null}
     </Modal>
   );
 }
@@ -861,7 +937,6 @@ export function CopyManualFlow({ text }: { text: string }) {
 
 /* ---------------------------------------------------------------- mark for recovery */
 export function ManualRecoveryFlow() {
-  const ui = useUI();
   const vs = store.state.vehicles.filter((v) => v.riderId && v.status !== "Marked_for_recovery");
   const [vid, setVid] = useState("");
   const [reason, setReason] = useState("");
@@ -869,6 +944,7 @@ export function ManualRecoveryFlow() {
   const [err, setErr] = useState("");
   const veh = G.vehicle(vid);
   const transition = useTransitionRider(veh?.riderId ?? "");
+  const disarm = useDisarmVehicle();
   return (
     <Modal
       title="Mark a vehicle for recovery"
@@ -880,7 +956,7 @@ export function ManualRecoveryFlow() {
           label: "Mark for recovery",
           kind: "danger",
           icon: "pin",
-          busy: transition.isPending ? "Saving…" : undefined,
+          busy: transition.isPending || disarm.isPending ? "Saving…" : undefined,
           onClick: async () => {
             const rs = reason.trim();
             if (!veh || !veh.riderId || rs.length < 3) {
@@ -894,8 +970,11 @@ export function ManualRecoveryFlow() {
               return false;
             }
             if (imm) {
-              simControl(veh, "immobilize", "Recovery in progress");
-              ui.toast("Immobilize is simulated until the backend supports it.", { type: "info" });
+              try {
+                await disarm.mutateAsync({ id: veh.id, reason: "Recovery in progress" });
+              } catch {
+                return false;
+              }
             }
           },
         },
@@ -921,7 +1000,7 @@ export function ManualRecoveryFlow() {
         <input className="input" id="mr-r" placeholder="e.g. Rider unreachable for 3 days" value={reason} onChange={(e) => setReason(e.target.value)} />
       </div>
       <label className="check" style={{ marginTop: 12 }}>
-        <input type="checkbox" id="mr-imm" checked={imm} onChange={(e) => setImm(e.target.checked)} /> Also immobilize the vehicle now (simulated)
+        <input type="checkbox" id="mr-imm" checked={imm} onChange={(e) => setImm(e.target.checked)} /> Also immobilize the vehicle now (via IOP relay)
       </label>
       {err ? <FieldError style={{ marginTop: 8 }}>{err}</FieldError> : null}
     </Modal>

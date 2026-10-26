@@ -7,6 +7,7 @@ import { errorText } from '@/lib/error-map';
 import {
   assignVehicle,
   createVehicle,
+  disarmVehicle,
   getAdminMap,
   getFleet,
   getFleetHealth,
@@ -14,10 +15,13 @@ import {
   getVehicleLive,
   getVehicleOdometer,
   getVehicleTrack,
+  listAuditLogs,
   listExpenses,
   listReplacements,
   listVehicles,
   logExpense,
+  pollFleetNow,
+  reactivateVehicle,
   renewVehicleSim,
   replaceVehicle,
   updateRecord,
@@ -161,4 +165,55 @@ export function useReconcile(enabled = false) {
 
 export function useAdminMap() {
   return useQuery({ queryKey: ['admin-map'], queryFn: getAdminMap, refetchInterval: 60_000 });
+}
+
+export function useDisarmVehicle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => disarmVehicle(id, reason),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ['fleet'] });
+      qc.invalidateQueries({ queryKey: ['admin-map'] });
+      qc.invalidateQueries({ queryKey: ['vehicle-live', v.id] });
+      qc.invalidateQueries({ queryKey: ['audit-logs'] });
+      toast.success('Immobilize command sent — relay confirmed');
+    },
+    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+  });
+}
+
+export function useReactivateVehicle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => reactivateVehicle(id, reason),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ['fleet'] });
+      qc.invalidateQueries({ queryKey: ['admin-map'] });
+      qc.invalidateQueries({ queryKey: ['vehicle-live', v.id] });
+      qc.invalidateQueries({ queryKey: ['audit-logs'] });
+      toast.success('Unlock command sent — relay confirmed');
+    },
+    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+  });
+}
+
+export function usePollFleet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => pollFleetNow(),
+    onSuccess: (d) => {
+      qc.invalidateQueries({ queryKey: ['fleet'] });
+      qc.invalidateQueries({ queryKey: ['admin-map'] });
+      qc.invalidateQueries({ queryKey: ['fleet-health'] });
+      toast.success(`Polled ${d.polled} trackers — ${d.updated} updated`);
+    },
+    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+  });
+}
+
+export function useAuditLogs(entity?: string, limit = 50) {
+  return useQuery({
+    queryKey: ['audit-logs', entity ?? 'all', limit],
+    queryFn: () => listAuditLogs(entity, limit),
+  });
 }

@@ -248,3 +248,43 @@ export interface AdminMap {
 export async function getAdminMap(): Promise<AdminMap> {
   return apiGet<AdminMap>('/admin/map');
 }
+
+// ---- Manual vehicle control (backend IoT relay; throttled 10/min) ----
+
+export interface ControlResult {
+  id: string;
+  status: string;
+  before: string;
+  commandId: string;
+}
+
+export async function disarmVehicle(id: string, reason: string): Promise<ControlResult> {
+  return apiPost<ControlResult>(`/admin/vehicles/${id}/disarm`, { reason });
+}
+
+export async function reactivateVehicle(id: string, reason: string): Promise<ControlResult> {
+  return apiPost<ControlResult>(`/admin/vehicles/${id}/reactivate`, { reason });
+}
+
+export async function pollFleetNow(): Promise<{ polled: number; updated: number }> {
+  return apiPost<{ polled: number; updated: number }>('/admin/fleet/poll');
+}
+
+export interface AuditLogRow {
+  id: string;
+  entity: string;
+  entityId: string;
+  actorId: string;
+  action: string;
+  before?: unknown;
+  after?: unknown;
+  reason?: string | null;
+  createdAt: string;
+}
+
+export async function listAuditLogs(entity?: string, limit = 50): Promise<AuditLogRow[]> {
+  const q = new URLSearchParams();
+  if (entity) q.set('entity', entity);
+  q.set('limit', String(limit));
+  return apiGet<AuditLogRow[]>(`/admin/audit-logs?${q.toString()}`);
+}

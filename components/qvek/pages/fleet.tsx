@@ -587,7 +587,7 @@ export function ReplacementPage() {
                 </div>
                 <p className="cell-sub" style={{ marginTop: 10, whiteSpace: "normal" }}>
                   {r ? r.name + "’s plan (" + (r.plan ? r.plan.name + " until " + U.fmtDate(r.plan.end) : "none") + ") continues. " : ""}
-                  {/Breakdown|Repair|Accident|Battery/.test(f.reason) ? "Old vehicle will be set to Repair_req." : f.reason ? "Old vehicle will return to Inactive." : ""}
+                  {f.reason ? "The old vehicle returns to the pool — update its record to Repair_req from the vehicle drawer if it needs repair." : ""}
                 </p>
               </div>
             </form>
