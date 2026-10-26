@@ -134,7 +134,10 @@ export function OnboardingPage() {
                         </td>
                         <td data-label="Platform">{r.platform}</td>
                         <td data-label="KYC">
-                          {k.allVerified ? <Badge tone="green">Verified 3/3</Badge> : k.complete ? <Badge tone="amber">Submitted 3/3</Badge> : <Badge tone="red">{k.submitted}/3 uploaded</Badge>}
+                          <div className="badge-row">
+                            {k.allVerified ? <Badge tone="green">Verified {k.total}/{k.total}</Badge> : k.complete ? <Badge tone="amber">Submitted {k.total}/{k.total}</Badge> : <Badge tone="red">{k.submitted}/{k.total} uploaded</Badge>}
+                            {k.dlSubmitted ? <Badge tone="blue">+ DL</Badge> : null}
+                          </div>
                         </td>
                         <td data-label="Deposit">
                           {r.deposit.status === "received" ? (

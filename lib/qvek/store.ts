@@ -23,6 +23,11 @@ export const DEFAULT_CONFIG: Config = {
   warehouseRadius: 0.6,
   idleHours: 72,
   support: { call: "", whatsapp: "", hours: "" },
+  kycDocs: [
+    { kind: "aadhaar", title: "Aadhaar", required: true },
+    { kind: "pan", title: "PAN", required: true },
+    { kind: "dl", title: "Driving Licence", required: false },
+  ],
   hubName: "Qvek Hub",
   admin: { id: "", password: "", otp: "", name: "Fleet Admin" },
   riderOtp: "",
@@ -98,11 +103,19 @@ export const D = {
     return entries;
   },
   kycSummary(r: Rider) {
-    const keys: KycKey[] = ["aadhaar", "pan", "dl"];
-    const docs = keys.map((k) => (r.kyc && r.kyc[k]) || { status: "missing" as const });
+    // Required set is server-driven (App content → KYC documents); fallback aadhaar+pan.
+    const defs = S().config.kycDocs.length
+      ? S().config.kycDocs
+      : [
+          { kind: "aadhaar", title: "Aadhaar", required: true },
+          { kind: "pan", title: "PAN", required: true },
+        ];
+    const reqKeys = defs.filter((d) => d.required).map((d) => d.kind) as KycKey[];
+    const docs = reqKeys.map((k) => (r.kyc && r.kyc[k]) || { status: "missing" as const });
     const verified = docs.filter((d) => d.status === "verified").length;
     const submitted = docs.filter((d) => d.status !== "missing").length;
-    return { verified, submitted, total: 3, complete: submitted === 3, allVerified: verified === 3 };
+    const dl = (r.kyc && r.kyc.dl) || { status: "missing" as const };
+    return { verified, submitted, total: reqKeys.length, complete: submitted === reqKeys.length, allVerified: verified === reqKeys.length, dlSubmitted: dl.status !== "missing" };
   },
   availableVehicles() {
     return S().vehicles.filter((v) => !v.riderId && v.status === "Inactive");

@@ -13,7 +13,7 @@ import type { RecoveryStep } from "@/lib/qvek/types";
 import { useAdmin } from "../admin-context";
 import { AssetBadge, ControlButton, EmptyState, LogRow, Plate, SearchBox } from "../bits";
 import { Icon } from "../icon";
-import { PricingCard, SupportCard, ZonesCard } from "../settings-cards";
+import { OpsAccessCard, OpsTimingsCard, PricingCard, SupportCard, ZonesCard } from "../settings-cards";
 import { MiniMap } from "../map-parts";
 import { useSetupMfa } from "@/features/auth/hooks";
 import { mockCaptureEnabled } from "@/features/payments/hooks";
@@ -585,6 +585,8 @@ export function SettingsPage() {
           <SupportCard key={supportKey} />
           <PricingCard />
           <ZonesCard />
+          <OpsTimingsCard />
+          <OpsAccessCard />
         </div>
         <div className="stack">
           <MfaCard />

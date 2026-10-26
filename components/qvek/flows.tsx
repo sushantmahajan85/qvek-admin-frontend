@@ -158,7 +158,7 @@ export function ApproveFlow({ id }: { id: string }) {
       <ul className="checklist">
         <li className={k.complete || k.submitted > 0 ? "ok" : "no"}>
           <span className="tick"><Icon name={k.complete || k.submitted > 0 ? "check" : "x"} size={14} /></span>
-          {k.complete ? "KYC documents reviewed (3/3)" : k.submitted > 0 ? "KYC details on file (" + k.submitted + "/3)" : "No KYC details on file"}
+          {k.complete ? "KYC documents reviewed (" + k.total + "/" + k.total + " required)" : k.submitted > 0 ? "KYC details on file (" + k.submitted + "/" + k.total + " required)" : "No KYC details on file"}
         </li>
         <li className={paid ? "ok" : "no"}>
           <span className="tick"><Icon name={paid ? "check" : "x"} size={14} /></span>Deposit + first week rent collected offline
@@ -166,7 +166,7 @@ export function ApproveFlow({ id }: { id: string }) {
       </ul>
       <div className="notice notice--warn" style={{ marginTop: 12 }}>
         <Icon name="alert" size={16} />
-        <span>Approval confirms the ₹3,000 security deposit and the first week&apos;s rent were collected offline. It unlocks the rider app.</span>
+        <span>Approval confirms the {U.money(store.state.config.deposit)} security deposit and the first week&apos;s rent were collected offline. It unlocks the rider app.</span>
       </div>
       <label className="check" style={{ marginTop: 12 }}>
         <input type="checkbox" id="ap-paid" checked={paid} onChange={(e) => setPaid(e.target.checked)} /> Paid token collected
@@ -708,8 +708,8 @@ export function EditKycFlow({ id }: { id: string }) {
             {err("panNo")}
           </div>
           <div className={cls("dlNo", " span-2")}>
-            <label htmlFor="kyc-dl">Driving licence</label>
-            <input className="input" id="kyc-dl" autoComplete="off" placeholder={info?.dlNo ?? "DL number"} value={form.dlNo} onChange={set("dlNo")} />
+            <label htmlFor="kyc-dl">Driving licence (optional)</label>
+            <input className="input" id="kyc-dl" autoComplete="off" placeholder={info?.dlNo ?? "DL number, if available"} value={form.dlNo} onChange={set("dlNo")} />
             {err("dlNo")}
           </div>
           <div className="field span-2">

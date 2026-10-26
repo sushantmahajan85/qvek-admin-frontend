@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useSetPricing, useSetSupport, useSetZones, useZones } from "@/features/config/hooks";
+import { useOps, useSetOps, useSetPricing, useSetSupport, useSetZones, useZones } from "@/features/config/hooks";
 import { useSupport } from "@/features/config/hooks";
 import { store } from "@/lib/qvek/store";
 import { FieldError } from "./bits";
@@ -235,6 +235,182 @@ export function ZonesCard() {
         <Button variant="primary" disabled={save.isPending || zones.isLoading} onClick={submit}>
           <Icon name="check" size={16} />
           {save.isPending ? "Saving…" : "Save zones"}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+export function OpsTimingsCard() {
+  const ops = useOps();
+  const save = useSetOps();
+  const d = ops.data;
+  const [grace, setGrace] = useState("");
+  const [warnDays, setWarnDays] = useState("");
+  const [offlineMin, setOfflineMin] = useState("");
+  const [simWatch, setSimWatch] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    if (!d || hydrated) return;
+    setGrace(String(d.graceHours));
+    setWarnDays(String(d.expiryWarningDays));
+    setOfflineMin(String(d.offlineThresholdMin));
+    setSimWatch(String(d.simWatchDays));
+    setHydrated(true);
+  }, [d, hydrated]);
+
+  const submit = () => {
+    const num = (s: string) => (s.trim() === "" ? undefined : Number(s));
+    const g = num(grace);
+    const w = num(warnDays);
+    const o = num(offlineMin);
+    const sw = num(simWatch);
+    if ([g, w, o, sw].some((v) => v !== undefined && (!Number.isInteger(v) || (v as number) < 0))) {
+      setErr("Timings must be whole numbers, zero or more.");
+      return;
+    }
+    if (g !== undefined && (g < 1 || g > 168)) {
+      setErr("Grace window must be 1–168 hours.");
+      return;
+    }
+    if (o !== undefined && (o < 1 || o > 120)) {
+      setErr("Offline threshold must be 1–120 minutes.");
+      return;
+    }
+    setErr(null);
+    save.mutate({
+      ...(g !== undefined ? { graceHours: g } : {}),
+      ...(w !== undefined ? { expiryWarningDays: w } : {}),
+      ...(o !== undefined ? { offlineThresholdMin: o } : {}),
+      ...(sw !== undefined ? { simWatchDays: sw } : {}),
+    });
+  };
+
+  return (
+    <section className="card">
+      <div className="card__head">
+        <h2>
+          <Icon name="clock" size={16} />
+          Operations timings
+        </h2>
+        {ops.isError ? <Badge tone="amber">Unavailable</Badge> : null}
+      </div>
+      <form className="card__body" noValidate onSubmit={(e) => { e.preventDefault(); submit(); }}>
+        <div className="form-grid">
+          <div className="field">
+            <label htmlFor="ops-grace">Grace window (hours)</label>
+            <input className="input" id="ops-grace" type="number" min={1} max={168} value={grace} onChange={(e) => setGrace(e.target.value)} disabled={ops.isLoading} />
+          </div>
+          <div className="field">
+            <label htmlFor="ops-warn">Expiry warning (days)</label>
+            <input className="input" id="ops-warn" type="number" min={0} max={14} value={warnDays} onChange={(e) => setWarnDays(e.target.value)} disabled={ops.isLoading} />
+          </div>
+          <div className="field">
+            <label htmlFor="ops-offline">Offline threshold (minutes)</label>
+            <input className="input" id="ops-offline" type="number" min={1} max={120} value={offlineMin} onChange={(e) => setOfflineMin(e.target.value)} disabled={ops.isLoading} />
+          </div>
+          <div className="field">
+            <label htmlFor="ops-sim">SIM watchlist (days)</label>
+            <input className="input" id="ops-sim" type="number" min={1} max={90} value={simWatch} onChange={(e) => setSimWatch(e.target.value)} disabled={ops.isLoading} />
+          </div>
+        </div>
+        <p className="field__hint" style={{ marginTop: 10 }}>
+          Grace locks the scooter at expiry and auto-blacklists after the window. Empty fields are left unchanged.
+        </p>
+        {err ? <FieldError>{err}</FieldError> : null}
+      </form>
+      <div className="card__foot">
+        <Button variant="primary" disabled={save.isPending || ops.isLoading} onClick={submit}>
+          <Icon name="check" size={16} />
+          {save.isPending ? "Saving…" : "Save timings"}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+export function OpsAccessCard() {
+  const ops = useOps();
+  const save = useSetOps();
+  const d = ops.data;
+  const [minAge, setMinAge] = useState("");
+  const [maxMb, setMaxMb] = useState("");
+  const [paused, setPaused] = useState(false);
+  const [message, setMessage] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    if (!d || hydrated) return;
+    setMinAge(String(d.signupMinAge));
+    setMaxMb(String(d.uploadMaxMb));
+    setPaused(d.signupsPaused);
+    setMessage(d.maintenanceMessage ?? "");
+    setHydrated(true);
+  }, [d, hydrated]);
+
+  const submit = () => {
+    const age = minAge.trim() === "" ? undefined : Number(minAge);
+    const mb = maxMb.trim() === "" ? undefined : Number(maxMb);
+    if (age !== undefined && (!Number.isInteger(age) || age < 16 || age > 100)) {
+      setErr("Minimum age must be 16–100.");
+      return;
+    }
+    if (mb !== undefined && (!Number.isInteger(mb) || mb < 1 || mb > 50)) {
+      setErr("Upload limit must be 1–50 MB.");
+      return;
+    }
+    if (message.trim().length > 280) {
+      setErr("Maintenance message must be 280 characters or less.");
+      return;
+    }
+    setErr(null);
+    save.mutate({
+      ...(age !== undefined ? { signupMinAge: age } : {}),
+      ...(mb !== undefined ? { uploadMaxMb: mb } : {}),
+      signupsPaused: paused,
+      maintenanceMessage: message.trim() === "" ? null : message.trim(),
+    });
+  };
+
+  return (
+    <section className="card">
+      <div className="card__head">
+        <h2>
+          <Icon name="shield" size={16} />
+          Signup, uploads &amp; notices
+        </h2>
+        {d?.signupsPaused ? <Badge tone="amber">Signups paused</Badge> : null}
+      </div>
+      <form className="card__body" noValidate onSubmit={(e) => { e.preventDefault(); submit(); }}>
+        <div className="form-grid">
+          <div className="field">
+            <label htmlFor="ops-age">Signup minimum age</label>
+            <input className="input" id="ops-age" type="number" min={16} max={100} value={minAge} onChange={(e) => setMinAge(e.target.value)} disabled={ops.isLoading} />
+          </div>
+          <div className="field">
+            <label htmlFor="ops-mb">KYC upload limit (MB)</label>
+            <input className="input" id="ops-mb" type="number" min={1} max={50} value={maxMb} onChange={(e) => setMaxMb(e.target.value)} disabled={ops.isLoading} />
+          </div>
+          <div className="field span-2">
+            <label htmlFor="ops-msg">Maintenance message (empty = no banner)</label>
+            <input className="input" id="ops-msg" maxLength={280} placeholder="e.g. Down Sunday 2–4 AM" value={message} onChange={(e) => setMessage(e.target.value)} disabled={ops.isLoading} />
+          </div>
+          <div className="field span-2">
+            <label className="check">
+              <input type="checkbox" id="ops-paused" checked={paused} onChange={(e) => setPaused(e.target.checked)} disabled={ops.isLoading} /> Pause new rider signups
+            </label>
+            <div className="field__hint">Admin-added riders still work while paused.</div>
+          </div>
+        </div>
+        {err ? <FieldError>{err}</FieldError> : null}
+      </form>
+      <div className="card__foot">
+        <Button variant="primary" disabled={save.isPending || ops.isLoading} onClick={submit}>
+          <Icon name="check" size={16} />
+          {save.isPending ? "Saving…" : "Save settings"}
         </Button>
       </div>
     </section>

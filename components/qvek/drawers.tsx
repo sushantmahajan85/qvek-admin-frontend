@@ -212,32 +212,58 @@ export function VehicleDrawerBody({ v, fin, onFin }: { v: Vehicle; fin: string; 
   );
 }
 
+const KNOWN_DOCS: Record<string, true> = { aadhaar: true, pan: true, dl: true };
+
 export function DocTiles({ r }: { r: Rider }) {
   const admin = useAdmin();
-  const fileFor = (k: KycKey) => r.kycInfo?.docs.find((d) => d.kind === k) ?? null;
+  // Server-driven doc list (App content → KYC documents); unknown kinds render generically.
+  const defs = store.state.config.kycDocs.length
+    ? store.state.config.kycDocs
+    : [
+        { kind: "aadhaar", title: "Aadhaar", required: true },
+        { kind: "pan", title: "PAN", required: true },
+        { kind: "dl", title: "Driving Licence", required: false },
+      ];
+  const fileFor = (kind: string) => r.kycInfo?.docs.find((d) => d.kind === kind) ?? null;
   return (
     <div className="doc-grid">
-      {(["aadhaar", "pan", "dl"] as KycKey[]).map((k) => {
-        const d = r.kyc[k] || { status: "missing" as const };
-        const file = fileFor(k);
+      {defs.map((def) => {
+        const k = def.kind as KycKey;
+        const known = !!KNOWN_DOCS[def.kind];
+        const d = (known ? r.kyc[k] : undefined) || { status: "missing" as const };
+        const file = fileFor(def.kind);
+        const title = (known && DOC_TITLES[k]) || def.title;
         if (d.status === "missing" && !file) {
           return (
-            <div key={k} className="doc doc--missing">
+            <div key={def.kind} className="doc doc--missing">
               <div className="doc__thumb"><Icon name="file" size={26} /></div>
               <div className="doc__meta">
-                <b>{DOC_TITLES[k]}</b>
-                <Badge tone="red">Missing</Badge>
+                <b>{title}</b>
+                {def.required ? <Badge tone="red">Missing</Badge> : <Badge tone="grey">Optional</Badge>}
               </div>
             </div>
           );
         }
+        if (!known) {
+          // Future doc kinds: open the uploaded file directly (no preview modal yet).
+          return (
+            <a key={def.kind} className="doc" href={file?.url} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
+              <div className="doc__thumb"><Icon name="image" size={26} /></div>
+              <div className="doc__meta">
+                <b>{title}</b>
+                <small>{file?.name ?? "Uploaded"}</small>
+                {d.status === "verified" ? <Badge tone="green">Verified</Badge> : <Badge tone="amber">Submitted</Badge>}
+              </div>
+            </a>
+          );
+        }
         return (
-          <button key={k} type="button" className="doc" onClick={() => admin.viewDoc(r.id, k)}>
+          <button key={def.kind} type="button" className="doc" onClick={() => admin.viewDoc(r.id, k)}>
             <div className="doc__thumb">
               {file ? (
                 // Real uploaded file; the signed URL loads the thumbnail itself.
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={file.url} alt={DOC_TITLES[k]} loading="lazy" />
+                <img src={file.url} alt={title} loading="lazy" />
               ) : d.sample ? (
                 <DocSvg kind={k} name={r.name} phone={r.phone} />
               ) : (
@@ -245,7 +271,7 @@ export function DocTiles({ r }: { r: Rider }) {
               )}
             </div>
             <div className="doc__meta">
-              <b>{DOC_TITLES[k]}</b>
+              <b>{title}</b>
               <small>{file?.name ?? d.file ?? "Uploaded"}</small>
               {d.status === "verified" ? <Badge tone="green">Verified</Badge> : <Badge tone="amber">Submitted</Badge>}
             </div>
@@ -311,18 +337,18 @@ export function RiderDrawerBody({ r, fin, onFin }: { r: Rider; fin: string; onFi
           <h3>
             Decision <Badge tone="amber">Pending review</Badge>
           </h3>
-          {!k.complete ? (
-            <div className="notice notice--warn" style={{ marginBottom: 12 }}>
-              <Icon name="alert" size={16} />
-              <span>
-                {r.kycLoaded ? "KYC details are incomplete (" + k.submitted + "/3). Add them from “Edit KYC” before approving." : "Loading KYC details…"}
-              </span>
-            </div>
-          ) : null}
+              {!k.complete ? (
+                <div className="notice notice--warn" style={{ marginBottom: 12 }}>
+                  <Icon name="alert" size={16} />
+                  <span>
+                      {r.kycLoaded ? "KYC details are incomplete (" + k.submitted + "/" + k.total + " required). Add them from “Edit KYC” before approving." : "Loading KYC details…"}
+                  </span>
+                </div>
+              ) : null}
           <div className="notice notice--info" style={{ marginBottom: 12 }}>
             <Icon name="info" size={16} />
             <span>
-              Approving confirms the ₹3,000 deposit <b>and</b> the first week&apos;s rent were collected offline. It unlocks the rider app.
+              Approving confirms the {U.money(store.state.config.deposit)} deposit <b>and</b> the first week&apos;s rent were collected offline. It unlocks the rider app.
             </span>
           </div>
           <div className="actions-row">
@@ -398,8 +424,8 @@ export function RiderDrawerBody({ r, fin, onFin }: { r: Rider; fin: string; onFi
       </div>
 
       <div className="dsec">
-        <h3>
-          KYC documents {k.allVerified ? <Badge tone="green">Verified</Badge> : <Badge tone="amber">{k.submitted}/3 submitted</Badge>}{" "}
+      <h3>
+        KYC documents {k.allVerified ? <Badge tone="green">Verified</Badge> : <Badge tone="amber">{k.submitted}/{k.total} submitted</Badge>}{" "}
           <Button size="sm" onClick={() => admin.editKyc(r.id)}>
             <Icon name="pencil" size={14} />
             Edit KYC

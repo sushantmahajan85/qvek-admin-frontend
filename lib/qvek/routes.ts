@@ -32,7 +32,7 @@ export const NAV: { group: string; items: { id: string; label: string; icon: str
       { id: "expenses", label: "Expenses", icon: "wallet" },
     ],
   },
-  { group: "System", items: [{ id: "settings", label: "Settings", icon: "settings" }] },
+  { group: "System", items: [{ id: "settings", label: "Settings", icon: "settings" }, { id: "content", label: "App content", icon: "smartphone" }] },
 ];
 
 export const PAGE_TITLES: Record<string, string> = {
@@ -48,6 +48,7 @@ export const PAGE_TITLES: Record<string, string> = {
   recovery: "Recovery",
   controls: "Vehicle controls",
   settings: "Settings",
+  content: "App content",
 };
 
 export const titleFor = (route: string) => PAGE_TITLES[route] || PAGE_TITLES.dashboard;

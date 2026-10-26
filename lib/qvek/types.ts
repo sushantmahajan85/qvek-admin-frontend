@@ -296,6 +296,8 @@ export interface Config {
   warehouseRadius: number;
   idleHours: number;
   support: { call: string; whatsapp: string; hours: string };
+  /** Enabled KYC documents (server-driven App content; fallback aadhaar+pan+dl). */
+  kycDocs: { kind: string; title: string; required: boolean }[];
   hubName: string;
   admin: { id: string; password: string; otp: string; name: string };
   riderOtp: string;

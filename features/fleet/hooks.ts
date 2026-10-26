@@ -70,7 +70,7 @@ export function useAssignVehicle() {
       qc.invalidateQueries({ queryKey: ['vehicles'] });
       qc.invalidateQueries({ queryKey: ['riders'] });
       qc.invalidateQueries({ queryKey: ['rider'] });
-      toast.success('Vehicle assigned — rental starts through next Tuesday');
+      toast.success('Vehicle assigned — rental starts immediately');
     },
     onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
   });

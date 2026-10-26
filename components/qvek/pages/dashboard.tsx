@@ -77,6 +77,7 @@ export function DashboardPage() {
   const [d, setD] = usePageState("dashboard");
 
   const c = counts();
+  const graceHours = useStore().config.graceHours;
   const stat = (_key: string, label: string, val: number, icon: string, tone: string, sub: string) => (
     <div className="stat">
       <div className="stat__top">
@@ -160,7 +161,7 @@ export function DashboardPage() {
         {stat("all", "Total fleet", c.fleet, "scooter", "tone-blue", "Single scooter type")}
         {stat("active", "Active & running", c.active, "checkCircle", "tone-green", "Valid plan, online")}
         {stat("immobilized", "Immobilized", c.immobilized, "lock", "tone-red", "Expiry, disarm or manual")}
-        {stat("grace", "In grace period", c.grace, "hourglass", "tone-amber", "24 h to recharge")}
+        {stat("grace", "In grace period", c.grace, "hourglass", "tone-amber", `${graceHours} h to recharge`)}
         {stat("recovery", "Marked for recovery", c.recovery, "pin", "tone-violet", "Share location link")}
         {stat("idle", "Idle 72h+", c.idle, "clock", "tone-amber", "Warehouse excluded")}
       </div>

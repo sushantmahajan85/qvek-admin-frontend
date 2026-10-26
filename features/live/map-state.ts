@@ -8,7 +8,7 @@
 import type { ExpenseRow, FleetRow, ReplacementRow } from '@/features/fleet/api';
 import type { KycData } from '@/features/kyc/api';
 import type { Rider as ApiRider } from '@/features/riders/api';
-import type { SupportConfig } from '@/features/config/api';
+import type { OpsConfig, SupportConfig, UiConfig } from '@/features/config/api';
 import type { TimelineEntry } from '@/features/timeline/api';
 import { PLAN_LABEL, type RiderStatus } from '@/lib/constants';
 import { DEFAULT_CONFIG, emptyState } from '@/lib/qvek/store';
@@ -42,6 +42,8 @@ export interface LiveInputs {
   replacements: ReplacementRow[];
   expenses: ExpenseRow[];
   support: SupportConfig | undefined;
+  ops: OpsConfig | undefined;
+  ui: UiConfig | undefined;
   username: string;
   hub: { lat: number; lng: number } | null;
   now: number;
@@ -177,6 +179,11 @@ export function buildState(inp: LiveInputs): State {
     })),
     support: { call: inp.support?.callNumber ?? '', whatsapp: inp.support?.whatsappNumber ?? '', hours: '' },
     admin: { ...DEFAULT_CONFIG.admin, id: inp.username, name: 'Fleet Admin' },
+    deposit: inp.support ? Math.round(inp.support.depositPaise / 100) : DEFAULT_CONFIG.deposit,
+    graceHours: inp.ops?.graceHours ?? DEFAULT_CONFIG.graceHours,
+    kycDocs: inp.ui
+      ? inp.ui.kycDocs.filter((d) => d.enabled).map((d) => ({ kind: d.kind, title: d.title, required: d.required }))
+      : DEFAULT_CONFIG.kycDocs,
   };
   s.clock = { base: now, setAt: now };
 

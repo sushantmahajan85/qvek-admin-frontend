@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useQueries } from '@tanstack/react-query';
-import { useSupport } from '@/features/config/hooks';
+import { useOps, useSupport, useUiConfig } from '@/features/config/hooks';
 import { useAdminMap, useExpenses, useFleet, useReplacements } from '@/features/fleet/hooks';
 import { getKycOrNull, kycKeys } from '@/features/kyc/api';
 import { useRiders } from '@/features/riders/hooks';
@@ -27,6 +27,8 @@ export function LiveDataProvider({ children }: { children: React.ReactNode }) {
   const replacements = useReplacements();
   const expenses = useExpenses();
   const support = useSupport();
+  const ops = useOps();
+  const ui = useUiConfig();
   const adminMap = useAdminMap();
 
   const simVersion = React.useSyncExternalStore(sim.subscribe, () => sim.version, () => 0);
@@ -65,6 +67,8 @@ export function LiveDataProvider({ children }: { children: React.ReactNode }) {
     replacements.dataUpdatedAt,
     expenses.dataUpdatedAt,
     support.dataUpdatedAt,
+    ops.dataUpdatedAt,
+    ui.dataUpdatedAt,
     adminMap.dataUpdatedAt,
     simVersion,
     timelineQs.map((q) => q.dataUpdatedAt).join(','),
@@ -92,6 +96,8 @@ export function LiveDataProvider({ children }: { children: React.ReactNode }) {
       replacements: replacements.data ?? [],
       expenses: expenses.data ?? [],
       support: support.data,
+      ops: ops.data,
+      ui: ui.data,
       username: getSessionUser() ?? 'admin',
       hub,
       now: Date.now(),
