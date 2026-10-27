@@ -23,11 +23,13 @@ const nextConfig = {
             value: [
               "default-src 'self'",
               // 'unsafe-eval' only for `next dev` (HMR/webpack). Production stays strict.
-              "script-src 'self' 'unsafe-inline'" + (isProd ? "" : " 'unsafe-eval'"),
-              "style-src 'self' 'unsafe-inline'",
-              // Leaflet map tiles + markers.
-              "img-src 'self' data: blob: https://*.tile.openstreetmap.org",
-              "connect-src 'self' " + apiOrigin,
+              "script-src 'self' 'unsafe-inline' https://maps.googleapis.com" + (isProd ? "" : " 'unsafe-eval'"),
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              // Google Maps tiles, markers + fonts.
+              "img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://maps.gstatic.com",
+              "font-src 'self' https://fonts.gstatic.com",
+              "connect-src 'self' " + apiOrigin + " https://maps.googleapis.com",
+              "worker-src 'self' blob:",
               "frame-ancestors 'none'",
             ].join('; '),
           },
