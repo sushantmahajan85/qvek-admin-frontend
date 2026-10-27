@@ -29,6 +29,8 @@ const MAP: Partial<Record<ErrorCode, string>> = {
   NO_CHANGES: 'No changes to save.',
   INVALID_PHONE: 'Enter a valid 10-digit mobile number.',
   PAYMENT_NOT_FOUND: 'Payment not found.',
+  PAYMENT_NOT_CONFIGURED: 'Razorpay keys missing — set RAZORPAY_KEY_ID/SECRET on the backend.',
+  PAYMENT_GATEWAY_ERROR: 'Razorpay did not respond — check keys and retry.',
   INTERNAL_ERROR: 'Something went wrong. Note the code and retry.',
 };
 

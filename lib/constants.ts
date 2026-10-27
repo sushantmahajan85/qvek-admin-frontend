@@ -87,6 +87,8 @@ export const ERROR_CODES = [
   'NO_CHANGES',
   'INVALID_PHONE',
   'PAYMENT_NOT_FOUND',
+  'PAYMENT_NOT_CONFIGURED',
+  'PAYMENT_GATEWAY_ERROR',
   'INTERNAL_ERROR',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
