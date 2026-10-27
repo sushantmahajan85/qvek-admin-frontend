@@ -16,17 +16,14 @@ import { ControlButton, EmptyState, Plate } from "../bits";
 import { Icon } from "../icon";
 import { useAutoRefresh } from "../use-auto-refresh";
 
-const FleetLeafletMap = dynamic(
-  () => import("../fleet-leaflet-map").then((m) => m.FleetLeafletMap),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="map-stage" style={{ display: "grid", placeItems: "center" }}>
-        <span className="spinner" />
-      </div>
-    ),
-  },
-);
+const FleetGoogleMap = dynamic(() => import("../fleet-google-map").then((m) => m.FleetGoogleMap), {
+  ssr: false,
+  loading: () => (
+    <div className="map-stage" style={{ display: "grid", placeItems: "center" }}>
+      <span className="spinner" />
+    </div>
+  ),
+});
 
 const KINDS: ("all" | VKind)[] = ["all", "active", "grace", "immobilized", "repair", "offline", "available", "recovery"];
 
@@ -212,14 +209,14 @@ export function MapPage() {
               ))}
             </div>
           </div>
-          <FleetLeafletMap
-            visibleIds={visibleIds}
-            selectedId={sel?.id ?? null}
-            onSelect={select}
-          />
-            <span className="map-banner">
-              <Icon name="info" size={13} />
-              Last known GPS positions · OpenStreetMap
+        <FleetGoogleMap
+          visibleIds={visibleIds}
+          selectedId={sel?.id ?? null}
+          onSelect={select}
+        />
+          <span className="map-banner">
+          <Icon name="info" size={13} />
+          Last known GPS positions · Google Maps
               {vs.some((v) => !v.hasGps) ? (
                 <> · {vs.filter((v) => !v.hasGps).length} without signal ({vs.filter((v) => !v.hasGps).map((v) => v.regNo).join(", ")})</>
               ) : null}
