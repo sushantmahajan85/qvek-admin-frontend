@@ -75,6 +75,26 @@ export function FleetGoogleMap({
       </div>
     );
   }
+  if (loadError) {
+    return (
+      <div className="map-stage" style={{ display: 'grid', placeItems: 'center' }}>
+        <p className="cell-sub" style={{ maxWidth: 460, textAlign: 'center' }}>
+          Google Maps failed to load. Check that the API key is valid, this domain is in its HTTP-referrer list, the
+          Maps JavaScript API is enabled, and billing is attached.{' '}
+          <button
+            type="button"
+            className="link"
+            onClick={() => {
+              map.refetch();
+              setRetryKey((k) => k + 1);
+            }}
+          >
+            Retry
+          </button>
+        </p>
+      </div>
+    );
+  }
   if (map.isLoading || !isLoaded) {
     return (
       <div className="map-stage" style={{ display: 'grid', placeItems: 'center' }}>
@@ -82,7 +102,7 @@ export function FleetGoogleMap({
       </div>
     );
   }
-  if (map.isError || !data || loadError) {
+  if (map.isError || !data) {
     return (
       <div className="map-stage" style={{ display: 'grid', placeItems: 'center' }}>
         <p className="cell-sub">
