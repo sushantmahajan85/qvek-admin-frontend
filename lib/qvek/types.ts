@@ -94,6 +94,10 @@ export interface Rider {
   edits?: RiderEdit[];
   /** Deposit + first-week rent collected offline (backend paidToken). */
   paidToken: boolean;
+  /** Account-deletion request timestamp (ms) — null when none. */
+  deletionRequestedAt?: number | null;
+  /** True once personal data has been anonymised. */
+  purged?: boolean;
   /** True once the rider's KYC record has been fetched (pending riders are fetched eagerly). */
   kycLoaded: boolean;
   /** Masked KYC details + signed document links from the API (when loaded and present). */

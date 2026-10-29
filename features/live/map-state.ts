@@ -242,6 +242,8 @@ export function buildState(inp: LiveInputs): State {
       flags: {},
       statusNote: '',
       paidToken: r.paidToken,
+      deletionRequestedAt: ms(r.deletionRequestedAt) || null,
+      purged: !!r.purgedAt,
       edits: sim.riderEdits[r.id],
     };
   });

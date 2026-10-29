@@ -5,7 +5,7 @@ import { toast } from '@/lib/toast';
 import { ApiError } from '@/lib/api-client';
 import { errorText } from '@/lib/error-map';
 import type { RiderStatus } from '@/lib/constants';
-import { approveRider, createRider, getRider, listRiders, rejectRider, riderKeys, transitionRider, updateRider, type UpdateRiderInput } from './api';
+import { approveRider, cancelRiderDeletion, createRider, getRider, listRiders, purgeRider, refundRiderDeposit, rejectRider, returnRiderVehicle, riderKeys, transitionRider, updateRider, type ReturnResult, type UpdateRiderInput } from './api';
 
 export function useRiders(q: string) {
   return useQuery({ queryKey: riderKeys.list(q), queryFn: () => listRiders(q) });
@@ -77,6 +77,70 @@ export function useRejectRider(id: string) {
     onSuccess: () => {
       invalidate(qc, id);
       toast.success('Application rejected');
+    },
+    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+  });
+}
+
+export function usePurgeRider(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => purgeRider(id),
+    onSuccess: (r) => {
+      invalidate(qc, id);
+      qc.invalidateQueries({ queryKey: ['fleet'] });
+      qc.invalidateQueries({ queryKey: ['timeline'] });
+      toast.success(`Account purged — ${r.documentsDeleted ?? 0} document(s) removed`);
+    },
+    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+  });
+}
+
+export function useCancelRiderDeletion(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => cancelRiderDeletion(id),
+    onSuccess: () => {
+      invalidate(qc, id);
+      qc.invalidateQueries({ queryKey: ['fleet'] });
+      toast.success('Deletion request cancelled — account restored');
+    },
+    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+  });
+}
+
+/** Refresh rider + fleet + money views after a return/refund. */
+function refreshSettlement(qc: ReturnType<typeof useQueryClient>, id: string) {
+  invalidate(qc, id);
+  qc.invalidateQueries({ queryKey: ['fleet'] });
+  qc.invalidateQueries({ queryKey: ['timeline'] });
+  qc.invalidateQueries({ queryKey: ['payments'] });
+}
+
+export function useReturnRider(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { reason?: string; vehicleStatus?: 'INACTIVE' | 'REPAIR' }) =>
+      returnRiderVehicle(id, input),
+    onSuccess: (r: ReturnResult) => {
+      refreshSettlement(qc, id);
+      toast.success(
+        r.assignmentEnded
+          ? `Vehicle released (${r.vehicleStatus}) — rider marked Returned`
+          : 'Rider marked Returned (no vehicle was assigned)',
+      );
+    },
+    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+  });
+}
+
+export function useRefundDeposit(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (reason?: string) => refundRiderDeposit(id, reason),
+    onSuccess: (r) => {
+      refreshSettlement(qc, id);
+      toast.success(`Deposit refund recorded — ₹${Math.round(r.amountPaise / 100).toLocaleString('en-IN')}`);
     },
     onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
   });

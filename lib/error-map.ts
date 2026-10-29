@@ -31,6 +31,14 @@ const MAP: Partial<Record<ErrorCode, string>> = {
   PAYMENT_NOT_FOUND: 'Payment not found.',
   PAYMENT_NOT_CONFIGURED: 'Razorpay keys missing — set RAZORPAY_KEY_ID/SECRET on the backend.',
   PAYMENT_GATEWAY_ERROR: 'Razorpay did not respond — check keys and retry.',
+  DEPOSIT_NOT_REFUNDED: 'Refund the security deposit before purging this account.',
+  DEPOSIT_ALREADY_REFUNDED: 'Deposit already refunded or settled.',
+  NO_DEPOSIT: 'No deposit on record for this rider.',
+  ACCOUNT_DELETION_PENDING: 'Account deletion pending — the rider cannot log in.',
+  ACCOUNT_ALREADY_DELETED: 'This account has already been deleted.',
+  NO_DELETION_REQUEST: 'No deletion request on file.',
+  DELETE_BLOCKED_ACTIVE_RENTAL: 'Vehicle still assigned — return it first.',
+  DELETE_BLOCKED_RECOVERY: 'Recovery or blacklist case must be closed first.',
   INTERNAL_ERROR: 'Something went wrong. Note the code and retry.',
 };
 

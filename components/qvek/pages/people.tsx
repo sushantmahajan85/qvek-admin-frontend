@@ -19,7 +19,8 @@ export function OnboardingPage() {
   const admin = useAdmin();
   useStore();
   const [o, setO] = usePageState("onboarding");
-  const s = store.state.riders;
+  // Purged (anonymised) accounts stay in finance history but never in people lists.
+  const s = store.state.riders.filter((r) => !r.purged);
   const c = counts();
   const n = (t: string) => s.filter((r) => r.application && (t === "all" || appStage(r) === t)).length;
   const tabs: [string, string][] = [
@@ -221,7 +222,8 @@ export function RidersPage() {
     ["Blacklisted", "Blacklisted"],
     ["Returned", "Returned"],
   ];
-  const all = store.state.riders;
+  // Purged (anonymised) accounts stay in finance history but never in people lists.
+  const all = store.state.riders.filter((r) => !r.purged);
   const n = (k: string) => all.filter((r) => r.application.status === "approved" && (k === "all" || (k === "grace" ? r.grace && !r.grace.lapsed : r.status === k))).length;
 
   let list = all.filter((r) => r.application.status === "approved" && matchRider(r, st.q));

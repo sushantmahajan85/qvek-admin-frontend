@@ -4,6 +4,7 @@
 import { useEffect } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { useCancelRiderDeletion, usePurgeRider, useRefundDeposit, useReturnRider } from "@/features/riders/hooks";
 import { Button } from "@/components/ui/button";
 import { formatPaise } from "@/features/config/api";
 import { requestKyc } from "@/features/live/requests";
@@ -15,6 +16,7 @@ import { U } from "@/lib/qvek/utils";
 import { useAdmin } from "./admin-context";
 import { AssetBadge, ControlButton, FinFilterSeg, FinRow, Plate, PlanStateBadge, RiderLink } from "./bits";
 import { DOC_TITLES, DocSvg } from "./doc-svg";
+import { useUI } from "./ui-context";
 import { Icon } from "./icon";
 import { MiniMap } from "./map-parts";
 import { VehicleGpsSection } from "./vehicle-gps";
@@ -329,9 +331,139 @@ export function RiderDrawerBody({ r, fin, onFin }: { r: Rider; fin: string; onFi
   const entries = D.financeFilter(s.finance.filter((e) => e.riderId === r.id), fin).sort((a, b) => b.at - a.at);
   const el = D.eligibility(r);
   const edits = r.edits || [];
+  const purge = usePurgeRider(r.id);
+  const cancelDeletion = useCancelRiderDeletion(r.id);
+  const refund = useRefundDeposit(r.id);
+  const doReturn = useReturnRider(r.id);
+  const ui = useUI();
+
+  const confirmReturn = () => {
+    void (async () => {
+      const ok = await ui.confirm({
+        title: `Mark ${r.name}'s scooter as returned?`,
+        icon: "warehouse",
+        confirmLabel: "Return vehicle",
+        body: (
+          <>
+            <p>The active assignment ends and the scooter is released as <b>Inactive</b> (available again).</p>
+            <p style={{ marginTop: 10 }}>The rider moves to <b>Returned</b>. Use &ldquo;Repair&rdquo; instead from the vehicle drawer if it needs work.</p>
+          </>
+        ),
+      });
+      if (ok) doReturn.mutate({ reason: "vehicle returned to hub" });
+    })();
+  };
+
+  const confirmRefund = () => {
+    void (async () => {
+      const amount = r.deposit.amount || 0;
+      const ok = await ui.confirm({
+        title: `Refund ${U.money(amount)} deposit to ${r.name}?`,
+        icon: "rupee",
+        confirmLabel: "Record refund",
+        body: (
+          <p>
+            Adds a <b>refund</b> row to the rider&rsquo;s financial history and audits it. Pay the money
+            out of band (cash/UPI) — this records the settlement, it does not transfer funds.
+          </p>
+        ),
+      });
+      if (ok) refund.mutate("security deposit refunded");
+    })();
+  };
+
+  const confirmPurge = () => {
+    void (async () => {
+      const ok = await ui.confirm({
+        title: `Purge ${r.name}'s data?`,
+        icon: "trash",
+        kind: "danger",
+        confirmLabel: "Purge permanently",
+        body: (
+          <>
+            <p>
+              Personal data is anonymised and unrecoverable: profile, KYC numbers, uploaded documents,
+              push tokens and sessions are removed.
+            </p>
+            <p style={{ marginTop: 10 }}>
+              Payment, expense and rental rows are kept with minimised identifiers for tax and dispute
+              retention. This action is audited.
+            </p>
+          </>
+        ),
+      });
+      if (ok) purge.mutate();
+    })();
+  };
 
   return (
     <>
+      {r.application.status === "approved" ? (
+        <div className="dsec">
+          <h3>
+            Return &amp; settlement <Badge tone="blue">Before deletion</Badge>
+          </h3>
+          <dl className="kv">
+            <dt>Vehicle</dt>
+            <dd>{v ? <Plate v={v} /> : <span className="cell-sub">Returned / none</span>}</dd>
+            <dt>Deposit</dt>
+            <dd>
+              {r.deposit.status === "received" ? (
+                <Badge tone="green">{U.money(r.deposit.amount)} held</Badge>
+              ) : r.deposit.status === "refunded" ? (
+                <Badge tone="violet">Refunded</Badge>
+              ) : (
+                <Badge tone="amber">Pending</Badge>
+              )}
+            </dd>
+          </dl>
+          <div className="actions-row" style={{ marginTop: 12 }}>
+            {v ? (
+              <Button size="sm" disabled={doReturn.isPending} onClick={confirmReturn}>
+                <Icon name="warehouse" size={15} />
+                {doReturn.isPending ? "Returning…" : "Mark vehicle returned"}
+              </Button>
+            ) : null}
+            {r.deposit.status === "received" ? (
+              <Button size="sm" variant="subtle" disabled={refund.isPending} onClick={confirmRefund}>
+                <Icon name="rupee" size={15} />
+                {refund.isPending ? "Recording…" : "Refund deposit"}
+              </Button>
+            ) : null}
+          </div>
+          <p className="field__hint" style={{ marginTop: 10 }}>
+            Account purge requires the scooter back and the deposit refunded, so riders can&rsquo;t lose their
+            refund when their contact details are anonymised.
+          </p>
+        </div>
+      ) : null}
+      {r.deletionRequestedAt ? (
+        <div className="dsec" style={{ borderColor: "#5A2632" }}>
+          <h3>
+            Deletion requested <Badge tone="red">Account deletion</Badge>
+          </h3>
+          <p style={{ fontSize: 13, color: "var(--text-2)" }}>
+            Requested on <b>{U.fmtDateTime(r.deletionRequestedAt)}</b>. The rider cannot log in while the
+            request is open. Privacy requests must be honoured within 30 days; the daily job purges
+            automatically after that if the account is clear.
+          </p>
+          <div className="actions-row" style={{ marginTop: 12 }}>
+            <Button variant="danger-ghost" size="sm" disabled={purge.isPending} onClick={confirmPurge}>
+              <Icon name="trash" size={15} />
+              {purge.isPending ? "Purging…" : "Purge data now"}
+            </Button>
+            <Button
+              variant="subtle"
+              size="sm"
+              disabled={cancelDeletion.isPending}
+              onClick={() => cancelDeletion.mutate()}
+            >
+              <Icon name="undo" size={15} />
+              {cancelDeletion.isPending ? "Cancelling…" : "Cancel request"}
+            </Button>
+          </div>
+        </div>
+      ) : null}
       {st === "pending" ? (
         <div className="dsec" style={{ borderColor: "#4E3E18" }}>
           <h3>

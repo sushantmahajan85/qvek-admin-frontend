@@ -11,6 +11,9 @@ export interface Rider {
   status: RiderStatus;
   paidToken: boolean;
   createdAt: string;
+  /** Account-deletion request (Play policy); purgedAt set once anonymised. */
+  deletionRequestedAt?: string | null;
+  purgedAt?: string | null;
 }
 
 export interface RiderDetail extends Rider {
@@ -68,4 +71,45 @@ export async function updateRider(id: string, input: UpdateRiderInput): Promise<
 
 export async function transitionRider(id: string, status: RiderStatus, reason: string): Promise<Rider> {
   return apiPost<Rider>(`/admin/riders/${id}/status`, { status, reason });
+}
+
+export interface PurgeResult {
+  ok: boolean;
+  id?: string;
+  purgedAt?: string;
+  documentsDeleted?: number;
+  alreadyPurged?: boolean;
+}
+
+export async function purgeRider(id: string): Promise<PurgeResult> {
+  return apiPost<PurgeResult>(`/admin/riders/${id}/purge`);
+}
+
+export async function cancelRiderDeletion(id: string): Promise<Rider> {
+  return apiPost<Rider>(`/admin/riders/${id}/deletion-cancel`);
+}
+
+export interface ReturnResult {
+  ok: boolean;
+  assignmentEnded: boolean;
+  vehicleId: string | null;
+  vehicleStatus: string | null;
+  status: string;
+}
+
+export async function returnRiderVehicle(
+  id: string,
+  input: { reason?: string; vehicleStatus?: 'INACTIVE' | 'REPAIR' },
+): Promise<ReturnResult> {
+  return apiPost<ReturnResult>(`/admin/riders/${id}/return`, input);
+}
+
+export interface RefundResult {
+  ok: boolean;
+  paymentId: string;
+  amountPaise: number;
+}
+
+export async function refundRiderDeposit(id: string, reason?: string): Promise<RefundResult> {
+  return apiPost<RefundResult>(`/admin/riders/${id}/deposit/refund`, reason ? { reason } : {});
 }
