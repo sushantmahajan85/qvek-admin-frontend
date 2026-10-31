@@ -505,7 +505,7 @@ export function RiderDrawerBody({ r, fin, onFin }: { r: Rider; fin: string; onFi
           <div className="notice notice--info" style={{ marginBottom: 12 }}>
             <Icon name="info" size={16} />
             <span>
-              Approving confirms the {U.money(store.state.config.deposit)} deposit <b>and</b> the first week&apos;s rent were collected offline. It unlocks the rider app.
+              Approving confirms the {U.money(store.state.config.deposit)} deposit.
             </span>
           </div>
           <div className="actions-row">

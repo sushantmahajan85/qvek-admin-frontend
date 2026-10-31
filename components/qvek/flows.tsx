@@ -189,7 +189,7 @@ export function ApproveFlow({ id }: { id: string }) {
         <>
           <div className="notice notice--warn" style={{ marginTop: 12 }}>
             <Icon name="alert" size={16} />
-            <span>Approval confirms the {U.money(store.state.config.deposit)} security deposit and the first week&apos;s rent were collected offline. It unlocks the rider app.</span>
+            <span>Approval confirms the {U.money(store.state.config.deposit)} security deposit.</span>
           </div>
           <label className="check" style={{ marginTop: 12 }}>
             <input type="checkbox" id="ap-paid" checked={paid} onChange={(e) => setPaid(e.target.checked)} /> Deposit collected offline
