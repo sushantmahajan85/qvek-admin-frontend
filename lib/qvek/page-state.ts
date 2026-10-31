@@ -38,7 +38,15 @@ export interface PageState {
   };
   finance: { q: string; f: string; status: string; sort: SortState; page: number };
   expenses: {
-    form: { type: ExpenseType; amount: string; date: string; riderId: string; vehicleId: string; notes: string };
+    form: {
+      type: ExpenseType;
+      amount: string;
+      date: string;
+      riderId: string;
+      vehicleId: string;
+      notes: string;
+      paidBy: "company" | "rider" | "deposit";
+    };
     err: Record<string, string>;
     filter: string;
   };
@@ -62,6 +70,7 @@ export const emptyExpenseForm = (type: ExpenseType = "repair"): PageState["expen
   riderId: "",
   vehicleId: "",
   notes: "",
+  paidBy: "company",
 });
 
 const ps: PageState = {

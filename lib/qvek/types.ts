@@ -34,6 +34,8 @@ export type Kyc = Record<KycKey, KycDoc>;
 export interface Deposit {
   status: "pending" | "received" | "refunded";
   amount: number;
+  /** Rupees consumed by deposit-paid expenses. */
+  used?: number;
   mode: "online" | "offline" | null;
   at: number | null;
 }
@@ -176,7 +178,8 @@ export type FinType =
   | "service"
   | "repair"
   | "servicing"
-  | "refund";
+  | "refund"
+  | "deposit_deduction";
 export type FinStatus = "success" | "pending" | "failed";
 
 export interface FinanceEntry {
@@ -202,6 +205,9 @@ export interface FinanceEntry {
 
 export type ExpenseType = "pending_deposit" | "repair" | "servicing";
 
+/** Who bears the cost. `deposit` deducts from the rider's held security deposit. */
+export type ExpensePaidBy = "company" | "rider" | "deposit";
+
 export interface Expense {
   id: string;
   type: ExpenseType;
@@ -210,6 +216,7 @@ export interface Expense {
   riderId: string | null;
   vehicleId: string | null;
   notes: string;
+  paidBy: ExpensePaidBy;
   at: number;
   financeId?: string;
 }

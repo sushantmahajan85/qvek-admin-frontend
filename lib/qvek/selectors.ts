@@ -32,6 +32,7 @@ export const FIN_STYLE: Record<string, [string, string]> = {
   repair: ["wrench", "tone-amber"],
   servicing: ["wrench", "tone-amber"],
   refund: ["undo", "tone-violet"],
+  deposit_deduction: ["shieldAlert", "tone-amber"],
 };
 export const FIN_STATUS: Record<string, [Tone, string]> = {
   success: ["green", "Success"],
@@ -113,7 +114,7 @@ export function matchRider(r: Rider, q: string) {
 export function matchVehicle(v: Vehicle, q: string) {
   if (!q) return true;
   const qq = q.toLowerCase().replace(/\s/g, "");
-  if ([v.regNo, v.chassisNo, v.motorNo, v.controllerNo].some((x) => String(x).toLowerCase().replace(/\s/g, "").includes(qq))) return true;
+  if ([v.regNo, v.iopId, v.chassisNo, v.motorNo, v.controllerNo].some((x) => String(x).toLowerCase().replace(/\s/g, "").includes(qq))) return true;
   const r = G.vehicleRider(v);
   return r ? matchRider(r, q) : false;
 }

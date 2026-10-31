@@ -92,6 +92,8 @@ function timelineType(kind: string): FinType {
     case 'REFUND':
     case 'SETTLEMENT':
       return 'refund';
+    case 'DEPOSIT_DEDUCTION':
+      return 'deposit_deduction';
     case 'REPAIR':
       return 'repair';
     case 'SERVICING':
@@ -109,6 +111,7 @@ const TIMELINE_TITLE: Record<FinType, string> = {
   repair: 'Repair expense',
   servicing: 'Servicing expense',
   refund: 'Refund',
+  deposit_deduction: 'Deposit used for expense',
 };
 
 function finStatus(s: string): FinStatus {
@@ -142,7 +145,13 @@ export function resolveHub(fleet: FleetRow[]): { lat: number; lng: number } | nu
   return { lat: med(pts.map((p) => p.lat)), lng: med(pts.map((p) => p.lng)) };
 }
 
-function mapKyc(status: RiderStatus, k: KycData | null | undefined): { kyc: Kyc; loaded: boolean; info: Rider['kycInfo'] } {
+/**
+ * KYC presence comes from the documents the rider uploaded (each carries a
+ * `kind`) OR the masked number, whichever exists. The rider app uploads files
+ * only — it never posts the Aadhaar/PAN digits — so counting numbers alone made
+ * the admin review queue show "0/2 uploaded" for a complete submission.
+ */
+export function mapKyc(status: RiderStatus, k: KycData | null | undefined): { kyc: Kyc; loaded: boolean; info: Rider['kycInfo'] } {
   const missing: KycDoc = { status: 'missing' };
   if (k === undefined) {
     // Not fetched (only pending riders are fetched eagerly). Approved riders had KYC verified at approval.
@@ -151,12 +160,24 @@ function mapKyc(status: RiderStatus, k: KycData | null | undefined): { kyc: Kyc;
     return { kyc: { aadhaar: d, pan: d, dl: d }, loaded: false, info: undefined };
   }
   if (k === null) return { kyc: { aadhaar: missing, pan: missing, dl: missing }, loaded: true, info: null };
-  const doc = (masked: string | null): KycDoc =>
-    masked ? { status: k.verified ? 'verified' : 'submitted', file: masked, sample: false, at: ms(k.updatedAt) } : missing;
+
+  const docs = k.docs ?? [];
+  const kindOf = (d: { kind: string }) => d.kind.trim().toLowerCase();
+  const firstDoc = (kind: string) => docs.find((d) => kindOf(d) === kind);
+  const doc = (kind: string, masked: string | null): KycDoc => {
+    const file = firstDoc(kind);
+    if (!file && !masked) return missing;
+    return {
+      status: k.verified ? 'verified' : 'submitted',
+      file: file?.name ?? file?.key.split('/').pop() ?? masked ?? 'Uploaded',
+      sample: false,
+      at: ms(k.updatedAt),
+    };
+  };
   return {
-    kyc: { aadhaar: doc(k.aadhaar), pan: doc(k.pan), dl: doc(k.dlNo) },
+    kyc: { aadhaar: doc('aadhaar', k.aadhaar), pan: doc('pan', k.pan), dl: doc('dl', k.dlNo) },
     loaded: true,
-    info: { fullName: k.fullName, aadhaar: k.aadhaar, pan: k.pan, dlNo: k.dlNo, verified: k.verified, docs: (k.docs ?? []).map((d) => ({ key: d.key, kind: d.kind, name: d.name ?? null, url: d.url })) },
+    info: { fullName: k.fullName, aadhaar: k.aadhaar, pan: k.pan, dlNo: k.dlNo, verified: k.verified, docs: docs.map((d) => ({ key: d.key, kind: d.kind, name: d.name ?? null, url: d.url })) },
   };
 }
 
@@ -209,6 +230,9 @@ export function buildState(inp: LiveInputs): State {
 
     const depositEntry = tl.find((e) => e.kind === 'DEPOSIT');
     const refunded = tl.some((e) => e.kind === 'REFUND' || e.kind === 'SETTLEMENT');
+    const depositUsedPaise = tl
+      .filter((e) => e.kind === 'DEPOSIT_DEDUCTION')
+      .reduce((sum, e) => sum + Number(e.amountPaise ?? 0), 0);
     const { kyc, loaded, info } = mapKyc(r.status, inp.kyc[r.id]);
     const applied = ms(r.createdAt);
 
@@ -232,7 +256,13 @@ export function buildState(inp: LiveInputs): State {
       kycLoaded: loaded,
       kycInfo: info,
       deposit: r.paidToken
-        ? { status: refunded ? 'refunded' : 'received', amount: DEFAULT_CONFIG.deposit, mode: 'offline', at: ms(depositEntry?.ts) || applied }
+        ? {
+            status: refunded ? 'refunded' : 'received',
+            amount: depositEntry ? Math.round(Number(depositEntry.amountPaise ?? 0) / 100) : DEFAULT_CONFIG.deposit,
+            used: Math.round(depositUsedPaise / 100),
+            mode: 'offline',
+            at: ms(depositEntry?.ts) || applied,
+          }
         : { status: 'pending', amount: 0, mode: null, at: null },
       status: RIDER_STATUS_MAP[r.status],
       vehicleId: row?.id ?? null,
@@ -362,6 +392,8 @@ export function buildState(inp: LiveInputs): State {
 
   /* ---- expenses / replacements ------------------------------------ */
   const expenseType = (k: ExpenseRow['kind']): ExpenseType => (k === 'DEPOSIT_PENDING' ? 'pending_deposit' : k === 'REPAIR' ? 'repair' : 'servicing');
+  const paidBy = (v?: string): Expense['paidBy'] =>
+    v === 'RIDER' ? 'rider' : v === 'RIDER_DEPOSIT' ? 'deposit' : 'company';
   s.expenses = inp.expenses.map((e): Expense => ({
     id: e.id,
     type: expenseType(e.kind),
@@ -370,6 +402,7 @@ export function buildState(inp: LiveInputs): State {
     riderId: e.riderId ?? null,
     vehicleId: e.vehicleId ?? null,
     notes: e.note ?? '',
+    paidBy: paidBy(e.paidBy),
     at: ms(e.createdAt),
     // Expenses with a rider are mirrored into that rider's financial history by the backend timeline.
     financeId: e.riderId ? e.id : undefined,

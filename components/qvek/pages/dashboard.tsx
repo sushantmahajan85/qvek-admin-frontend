@@ -29,7 +29,9 @@ import {
   VFlags,
 } from "../bits";
 import { Icon } from "../icon";
-import { FleetGpsHealth } from "../fleet-gps-health";
+// Tracker health strip (vendor counts / SIM expiry / stale devices) removed from
+// the dashboard per operations request. Component kept in fleet-gps-health.tsx.
+// import { FleetGpsHealth } from "../fleet-gps-health";
 import { RowDetail } from "../dashboard-detail";
 import { useUI } from "../ui-context";
 import { useAutoRefresh } from "../use-auto-refresh";
@@ -165,7 +167,8 @@ export function DashboardPage() {
         {stat("recovery", "Marked for recovery", c.recovery, "pin", "tone-violet", "Share location link")}
         {stat("idle", "Idle 72h+", c.idle, "clock", "tone-amber", "Warehouse excluded")}
       </div>
-      <FleetGpsHealth />
+      {/* Tracker health section removed from the dashboard.
+      <FleetGpsHealth /> */}
       <section className="card">
         <div className="toolbar">
           <SearchBox value={d.q} onChange={(q) => setD({ q, page: 1 })} placeholder="Search rider name, phone, Customer ID, vehicle no. or chassis no." />
@@ -228,6 +231,7 @@ export function DashboardPage() {
                           </th>
                           <th>Status</th>
                           <SortTh label="Vehicle No." sortKey="vehicle" sort={d.sort} onSort={onSort} />
+                          <th>IOP ID</th>
                           <th>Motor No.</th>
                           <SortTh label="Chassis No." sortKey="chassis" sort={d.sort} onSort={onSort} />
                           <SortTh label="Rider" sortKey="rider" sort={d.sort} onSort={onSort} />
@@ -269,6 +273,9 @@ export function DashboardPage() {
                                 </td>
                                 <td data-label="Vehicle No.">
                                   <Plate v={v} />
+                                </td>
+                                <td data-label="IOP ID">
+                                  <span className="cell-mono">{v.iopId || "—"}</span>
                                 </td>
                                 <td data-label="Motor No.">
                                   <span className="cell-mono">{v.motorNo}</span>

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { apiGet, apiPatch, apiPost } from '@/lib/api-client';
+import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api-client';
 import type { RiderStatus, VehicleStatus } from '@/lib/constants';
 
 export interface FleetRecovery {
@@ -57,6 +57,7 @@ export interface Vehicle {
 export const vehicleSchema = z.object({
   vehicleNo: z.string().min(2).max(32),
   iopId: z.string().min(1).max(64),
+  type: z.string().min(1).max(32).optional(),
   chassisNo: z.string().min(2).max(64).optional(),
   motorNo: z.string().min(1).max(64).optional(),
   controllerNo: z.string().min(1).max(64).optional(),
@@ -79,6 +80,33 @@ export async function listVehicles(): Promise<Vehicle[]> {
 
 export async function createVehicle(input: VehicleInput): Promise<Vehicle> {
   return apiPost<Vehicle>('/admin/vehicles', input);
+}
+
+export interface BulkVehicleRowResult {
+  index: number;
+  vehicleNo: string;
+  iopId: string;
+  status: 'created' | 'restored' | 'skipped';
+  code?: string;
+  message?: string;
+}
+
+export interface BulkVehiclesResult {
+  total: number;
+  created: number;
+  restored: number;
+  skipped: number;
+  results: BulkVehicleRowResult[];
+}
+
+/** Spreadsheet import: rows are parsed/validated in the browser, then posted. */
+export async function bulkCreateVehicles(rows: VehicleInput[]): Promise<BulkVehiclesResult> {
+  return apiPost<BulkVehiclesResult>('/admin/vehicles/bulk', { rows });
+}
+
+/** Soft delete. Refused while the vehicle has an active assignment. */
+export async function removeVehicle(id: string): Promise<{ id: string; deleted: boolean }> {
+  return apiDelete<{ id: string; deleted: boolean }>(`/admin/vehicles/${id}`);
 }
 
 export async function assignVehicle(input: AssignInput) {
@@ -113,6 +141,8 @@ export interface ExpenseInput {
   kind: 'DEPOSIT_PENDING' | 'REPAIR' | 'SERVICING';
   amountPaise: number;
   note?: string;
+  /** Who bears the cost. RIDER_DEPOSIT deducts from the held deposit. */
+  paidBy?: 'COMPANY' | 'RIDER' | 'RIDER_DEPOSIT';
 }
 
 export async function logExpense(input: ExpenseInput) {
@@ -141,6 +171,7 @@ export interface ExpenseRow {
   kind: ExpenseInput['kind'];
   amountPaise: number;
   note?: string | null;
+  paidBy?: 'COMPANY' | 'RIDER' | 'RIDER_DEPOSIT';
   createdAt: string;
 }
 

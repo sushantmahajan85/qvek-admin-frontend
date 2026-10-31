@@ -3,7 +3,8 @@ import { ApiError, apiGet, apiPost } from '@/lib/api-client';
 
 export interface KycDoc {
   key: string;
-  kind: 'aadhaar' | 'pan' | 'other';
+  /** Server-driven: aadhaar/pan/dl today, custom kinds possible. */
+  kind: string;
   name?: string | null;
   url: string;
   expiresInSec: number;

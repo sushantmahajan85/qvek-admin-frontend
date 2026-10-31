@@ -3,7 +3,7 @@ import type { ErrorCode } from './constants';
 // Backend `code` → admin-facing toast text. Never branch on HTTP status alone.
 // Unknown codes fall back to a generic message (still showing the code for triage).
 const MAP: Partial<Record<ErrorCode, string>> = {
-  APPROVAL_REQUIRES_PAID_TOKEN: 'Collect the Rs.3,000 deposit + first week rent offline first.',
+  APPROVAL_REQUIRES_PAID_TOKEN: 'No deposit on file — collect it offline or wait for the rider’s in-app payment before approving.',
   VEHICLE_ALREADY_ASSIGNED: 'This rider already holds a vehicle.',
   VEHICLE_TAKEN: 'This vehicle is already assigned to someone else.',
   RIDER_NOT_ACTIVE: 'Only Active riders can hold a vehicle.',
@@ -12,9 +12,15 @@ const MAP: Partial<Record<ErrorCode, string>> = {
   FIRST_RECHARGE_REQUIRED: 'Assign only after the rider completes the first recharge.',
   NO_ACTIVE_ASSIGNMENT: 'This rider holds no vehicle to replace.',
   VEHICLE_EXISTS: 'That vehicle number, IOP id or chassis number is already taken.',
+  VEHICLE_IN_USE: 'End the active assignment (return the scooter) before deleting this vehicle.',
+  DUPLICATE_IN_FILE: 'The same vehicle or IOP ID appears more than once in this file.',
   VEHICLE_NOT_FOUND: 'Vehicle not found.',
   RIDER_NOT_FOUND: 'Rider not found.',
   EXPENSE_TARGET_REQUIRED: 'Link the expense to a rider or a vehicle.',
+  EXPENSE_RIDER_REQUIRED: 'Link the expense to a rider when the rider or their deposit pays.',
+  DEPOSIT_NOT_AVAILABLE: 'No security deposit is held for this rider.',
+  DEPOSIT_INSUFFICIENT: 'The expense is larger than the remaining security deposit.',
+  DEPOSIT_FULLY_USED: 'The security deposit was fully used by expenses — nothing left to refund.',
   INVALID_FILE: 'That file type is not accepted.',
   INVALID_CREDENTIALS: 'Invalid username or password.',
   ACCOUNT_LOCKED: 'Locked after too many attempts — try again in 15 minutes.',
@@ -30,6 +36,7 @@ const MAP: Partial<Record<ErrorCode, string>> = {
   INVALID_PHONE: 'Enter a valid 10-digit mobile number.',
   PAYMENT_NOT_FOUND: 'Payment not found.',
   PAYMENT_NOT_CONFIGURED: 'Razorpay keys missing — set RAZORPAY_KEY_ID/SECRET on the backend.',
+  DEPOSIT_ALREADY_PAID: 'A security deposit is already on record — no second deposit is created.',
   PAYMENT_GATEWAY_ERROR: 'Razorpay did not respond — check keys and retry.',
   DEPOSIT_NOT_REFUNDED: 'Refund the security deposit before purging this account.',
   DEPOSIT_ALREADY_REFUNDED: 'Deposit already refunded or settled.',

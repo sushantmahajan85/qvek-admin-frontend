@@ -23,7 +23,10 @@ export interface AdminApi {
   vehicleStatus(vehicleId: string): void;
   editComponents(vehicleId: string): void;
   addRider(): void;
+  deleteRider(riderId: string): void;
   addVehicle(): void;
+  importVehicles(): void;
+  deleteVehicle(vehicleId: string): void;
   finDetail(entryId: string): void;
 
   goReplace(riderId: string): void;

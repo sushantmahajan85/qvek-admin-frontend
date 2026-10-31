@@ -17,39 +17,48 @@ export function PricingCard() {
   const support = useSupport();
   const save = useSetPricing();
   const server = support.data;
-  const [weekly, setWeekly] = useState("");
-  const [fortnightly, setFortnightly] = useState("");
-  const [fourWeekly, setFourWeekly] = useState("");
+  const [daily, setDaily] = useState("");
   const [deposit, setDeposit] = useState("");
+  const [touched, setTouched] = useState({ daily: false, deposit: false });
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!server) return;
-    setWeekly(String(Math.round(server.weeklyRentPaise / 100)));
-    setFortnightly(String(Math.round((server.plans["2-WEEKLY"] ?? 0) / 100)));
-    setFourWeekly(String(Math.round((server.plans["4-WEEKLY"] ?? 0) / 100)));
+    setDaily(String(Math.round((server.dailyRentPaise ?? server.weeklyRentPaise / 7) / 100)));
     setDeposit(String(Math.round((server.depositPaise ?? 300000) / 100)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [server]);
 
+  const dailyRupees = Number(daily);
+  const derived = Number.isFinite(dailyRupees) && dailyRupees >= 0
+    ? { week: dailyRupees * 7, fortnight: dailyRupees * 14, fourWeek: dailyRupees * 28 }
+    : null;
+
   const submit = () => {
     const toPaise = (s: string) => (s.trim() === "" ? undefined : Math.round(Number(s) * 100));
-    const w = toPaise(weekly);
-    const f = toPaise(fortnightly);
-    const fw = toPaise(fourWeekly);
-    const d = toPaise(deposit);
-    for (const [label, v] of [["Weekly", w], ["Fortnightly", f], ["Four-weekly", fw], ["Deposit", d]] as const) {
+    const d = toPaise(daily);
+    const dep = toPaise(deposit);
+    for (const [label, v] of [["Daily price", d], ["Deposit", dep]] as const) {
       if (v !== undefined && (!Number.isInteger(v) || v < 0)) {
         setErr(`${label} must be a non-negative rupee amount.`);
         return;
       }
     }
-    if (w === undefined && f === undefined && fw === undefined && d === undefined) {
-      setErr("Enter at least one price to update.");
+    if (touched.daily && (d === undefined || d < 100)) {
+      setErr("Daily price must be at least ₹1.");
+      return;
+    }
+    if (!touched.daily && !touched.deposit) {
+      setErr("Change a price to update.");
       return;
     }
     setErr(null);
-    save.mutate({ ...(w !== undefined ? { weeklyPaise: w } : {}), ...(f !== undefined ? { fortnightlyPaise: f } : {}), ...(fw !== undefined ? { fourWeeklyPaise: fw } : {}), ...(d !== undefined ? { depositPaise: d } : {}) });
+    // Only send what the admin edited, so a deposit-only save never rewrites
+    // plan prices (legacy rows may not be exact daily multiples).
+    save.mutate({
+      ...(touched.daily && d !== undefined ? { dailyPaise: d } : {}),
+      ...(touched.deposit && dep !== undefined ? { depositPaise: dep } : {}),
+    });
   };
 
   const c = store.state.config;
@@ -65,36 +74,62 @@ export function PricingCard() {
       <form className="card__body" id="price-form" noValidate onSubmit={(e) => { e.preventDefault(); submit(); }}>
         <div className="form-grid">
           <div className="field">
-            <label htmlFor="pl-weekly">Weekly (7 days)</label>
+            <label htmlFor="pl-daily">Daily price (per day)</label>
             <div className="input-prefix">
               <span>₹</span>
-              <input id="pl-weekly" type="number" min={0} placeholder={c.plans[0] ? String(c.plans[0].price) : ""} value={weekly} onChange={(e) => setWeekly(e.target.value)} disabled={support.isLoading} />
+              <input
+                id="pl-daily"
+                type="number"
+                min={0}
+                step={1}
+                placeholder={c.plans[0] ? String(Math.round(c.plans[0].price / 7)) : ""}
+                value={daily}
+                onChange={(e) => {
+                  setDaily(e.target.value);
+                  setTouched((t) => ({ ...t, daily: true }));
+                }}
+                disabled={support.isLoading}
+              />
             </div>
-          </div>
-          <div className="field">
-            <label htmlFor="pl-fortnightly">Fortnightly (14 days)</label>
-            <div className="input-prefix">
-              <span>₹</span>
-              <input id="pl-fortnightly" type="number" min={0} value={fortnightly} onChange={(e) => setFortnightly(e.target.value)} disabled={support.isLoading} />
-            </div>
-          </div>
-          <div className="field">
-            <label htmlFor="pl-fourweekly">Four-weekly (28 days)</label>
-            <div className="input-prefix">
-              <span>₹</span>
-              <input id="pl-fourweekly" type="number" min={0} value={fourWeekly} onChange={(e) => setFourWeekly(e.target.value)} disabled={support.isLoading} />
-            </div>
+            <div className="field__hint">Charged per day; weekly and longer plans are derived from it.</div>
           </div>
           <div className="field">
             <label htmlFor="pl-deposit">Security deposit</label>
             <div className="input-prefix">
               <span>₹</span>
-              <input id="pl-deposit" type="number" min={0} value={deposit} onChange={(e) => setDeposit(e.target.value)} disabled={support.isLoading} />
+              <input
+                id="pl-deposit"
+                type="number"
+                min={0}
+                step={1}
+                value={deposit}
+                onChange={(e) => {
+                  setDeposit(e.target.value);
+                  setTouched((t) => ({ ...t, deposit: true }));
+                }}
+                disabled={support.isLoading}
+              />
             </div>
+            <div className="field__hint">Collected offline with the first week&rsquo;s rent.</div>
           </div>
         </div>
+
+        {derived ? (
+          <div style={{ marginTop: 12 }}>
+            <dl className="kv">
+              <dt>Weekly plan (7 days)</dt>
+              <dd>₹{derived.week.toLocaleString("en-IN")}</dd>
+              <dt>Fortnightly (14 days)</dt>
+              <dd>₹{derived.fortnight.toLocaleString("en-IN")}</dd>
+              <dt>Four-weekly (28 days)</dt>
+              <dd>₹{derived.fourWeek.toLocaleString("en-IN")}</dd>
+            </dl>
+          </div>
+        ) : null}
+
         <p className="field__hint" style={{ marginTop: 12 }}>
-          All plans run Tuesday to Tuesday. Saved via PUT /config/pricing; empty fields are left unchanged.
+          All plans run Tuesday to Tuesday. The daily rate is saved via PUT /config/pricing and the weekly,
+          fortnightly and four-weekly prices are updated from it automatically. Empty fields are left unchanged.
         </p>
         {err ? <FieldError>{err}</FieldError> : null}
         {support.isError ? <FieldError>Could not load server pricing.</FieldError> : null}

@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost } from '@/lib/api-client';
+import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api-client';
 import type { RiderStatus } from '@/lib/constants';
 
 export interface Rider {
@@ -83,6 +83,15 @@ export interface PurgeResult {
 
 export async function purgeRider(id: string): Promise<PurgeResult> {
   return apiPost<PurgeResult>(`/admin/riders/${id}/purge`);
+}
+
+/**
+ * Admin-initiated delete from the riders page. Same guarded purge: anonymises
+ * the profile, deletes KYC docs/devices/sessions, keeps financial rows. Refused
+ * while a vehicle is assigned or the deposit is held.
+ */
+export async function deleteRider(id: string): Promise<PurgeResult> {
+  return apiDelete<PurgeResult>(`/admin/riders/${id}`);
 }
 
 export async function cancelRiderDeletion(id: string): Promise<Rider> {

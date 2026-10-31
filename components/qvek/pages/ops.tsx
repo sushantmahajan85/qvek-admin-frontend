@@ -13,7 +13,10 @@ import type { RecoveryStep } from "@/lib/qvek/types";
 import { useAdmin } from "../admin-context";
 import { AssetBadge, ControlButton, EmptyState, LogRow, Plate, SearchBox } from "../bits";
 import { Icon } from "../icon";
-import { OpsAccessCard, OpsTimingsCard, PricingCard, SupportCard, ZonesCard } from "../settings-cards";
+// Ops timings + signup/upload notices cards are disabled per operations request.
+// Components stay in settings-cards.tsx so they can be re-enabled by uncommenting.
+// import { OpsAccessCard, OpsTimingsCard, PricingCard, SupportCard, ZonesCard } from "../settings-cards";
+import { PricingCard, SupportCard, ZonesCard } from "../settings-cards";
 import { MiniMap } from "../map-parts";
 import { useSetupMfa } from "@/features/auth/hooks";
 import { mockCaptureEnabled } from "@/features/payments/hooks";
@@ -90,6 +93,8 @@ export function RecoveryPage() {
                     <dd>{r ? r.name + " · " + r.customerId : "—"}</dd>
                     <dt>Rider status</dt>
                     <dd>{r ? <AssetBadge status={r.status} /> : "—"}</dd>
+                    <dt>IOP device ID</dt>
+                    <dd className="cell-mono">{v.iopId || "—"}</dd>
                     <dt>Phone</dt>
                     <dd>{r ? U.phone(r.phone) : "—"}</dd>
                     <dt>Marked</dt>
@@ -207,6 +212,7 @@ export function RecoveryPage() {
                     <tr key={rc.id}>
                       <td>
                         <Plate v={v} />
+                        <span className="cell-sub" style={{ display: "block" }}>IOP {v.iopId || "—"}</span>
                       </td>
                       <td>{r ? r.name : "—"}</td>
                       <td>{U.fmtDateTime(rc.markedAt)}</td>
@@ -322,6 +328,7 @@ export function ControlsPage() {
                       <tr key={v.id}>
                         <td data-label="Vehicle">
                           <Plate v={v} />
+                          <span className="cell-sub" style={{ display: "block" }}>IOP {v.iopId || "—"}</span>
                         </td>
                         <td data-label="Rider">
                           {r ? (
@@ -585,8 +592,10 @@ export function SettingsPage() {
           <SupportCard key={supportKey} />
           <PricingCard />
           <ZonesCard />
-          <OpsTimingsCard />
-          <OpsAccessCard />
+          {/* Hidden for now — operational timings (grace/warn/offline/SIM).
+          <OpsTimingsCard /> */}
+          {/* Hidden for now — signup, uploads & notices.
+          <OpsAccessCard /> */}
         </div>
         <div className="stack">
           <MfaCard />

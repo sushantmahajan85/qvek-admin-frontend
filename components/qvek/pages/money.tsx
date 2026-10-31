@@ -22,7 +22,10 @@ export function FinancePage() {
   const all = store.state.finance;
   const sum = (fn: (e: (typeof all)[number]) => boolean) => all.filter(fn).reduce((s, e) => s + e.amount, 0);
   const rent = sum((e) => e.status === "success" && (e.type === "recharge" || e.type === "first_cycle"));
-  const deps = sum((e) => e.status === "success" && e.type === "deposit") - sum((e) => e.status === "success" && e.type === "refund");
+  const deps =
+    sum((e) => e.status === "success" && e.type === "deposit") -
+    sum((e) => e.status === "success" && e.type === "refund") -
+    sum((e) => e.status === "success" && e.type === "deposit_deduction");
   const svc = sum((e) => e.status === "success" && ["service", "repair", "servicing"].includes(e.type));
   const pend = all.filter((e) => e.status === "pending").length;
   const failed = all.filter((e) => e.status === "failed").length;
@@ -77,7 +80,7 @@ export function FinancePage() {
       </div>
       <div className="stats" style={{ gridTemplateColumns: "repeat(5,minmax(0,1fr))" }}>
         {statC("Rent collected", U.money(rent), "zap", "tone-green", "Successful recharges")}
-        {statC("Deposits held (net)", U.money(deps), "shield", "tone-blue", "After refunds")}
+        {statC("Deposits held (net)", U.money(deps), "shield", "tone-blue", "After refunds & expenses")}
         {statC("Service & repair logs", U.money(svc), "wrench", "tone-amber", "Logged against riders")}
         {statC("Pending", pend, "clock", "tone-amber", "Awaiting confirmation")}
         {statC("Failed", failed, "alertCircle", "tone-red", "Not confirmed")}
@@ -193,6 +196,18 @@ const TYPES: [ExpenseType, string, string][] = [
   ["servicing", "Servicing", "cog"],
 ];
 
+const PAYERS: ["company" | "rider" | "deposit", string, string][] = [
+  ["company", "Company", "briefcase"],
+  ["rider", "Rider", "user"],
+  ["deposit", "Rider deposit", "shield"],
+];
+
+const PAYER_LABEL: Record<string, [string, "grey" | "blue" | "violet"]> = {
+  company: ["Company", "grey"],
+  rider: ["Rider", "blue"],
+  deposit: ["Rider deposit", "violet"],
+};
+
 export function ExpensesPage() {
   const ui = useUI();
   const logExpense = useLogExpense();
@@ -205,6 +220,8 @@ export function ExpensesPage() {
   const vehicles = s.vehicles;
   const list = s.expenses.filter((x) => st.filter === "all" || x.type === st.filter).sort((a, b) => b.at - a.at);
   const total = (t: string) => s.expenses.filter((x) => t === "all" || x.type === t).reduce((sum, x) => sum + x.amount, 0);
+  const payerRider = f.riderId ? G.rider(f.riderId) : null;
+  const depositRemaining = payerRider ? Math.max(0, payerRider.deposit.amount - (payerRider.deposit.used ?? 0)) : 0;
 
   const setForm = (patch: Partial<typeof f>) =>
     setSt((x) => {
@@ -226,16 +243,31 @@ export function ExpensesPage() {
     }
     if (form.type !== "pending_deposit" && !form.vehicleId) er.vehicleId = "Repair and servicing expenses must be linked to a vehicle.";
     if (form.type !== "pending_deposit" && !form.notes.trim()) er.notes = "Describe the work done.";
+    if (form.paidBy !== "company" && !form.riderId) {
+      er.riderId = "Select the rider who pays, or switch to Company.";
+    }
+    if (form.paidBy === "deposit" && form.riderId) {
+      const pr = G.rider(form.riderId);
+      const held = pr?.deposit.status === "received";
+      const remaining = pr ? Math.max(0, pr.deposit.amount - (pr.deposit.used ?? 0)) : 0;
+      if (!held) er.riderId = "This rider has no security deposit on record.";
+      else if (remaining <= 0) er.riderId = "This rider's security deposit is fully used.";
+      else if (!er.amount && amt > remaining) {
+        er.amount = `Deposit remaining is ${U.money(remaining)} — reduce the amount.`;
+      }
+    }
     patchPageState("expenses", { err: er });
     if (Object.keys(er).length) {
       ui.toast("Please fix the highlighted fields.", { type: "error" });
       return;
     }
     const kind = form.type === "pending_deposit" ? "DEPOSIT_PENDING" : form.type === "repair" ? "REPAIR" : "SERVICING";
+    const paidBy = form.paidBy === "deposit" ? "RIDER_DEPOSIT" : form.paidBy === "rider" ? "RIDER" : "COMPANY";
     try {
       // The hook toasts success / the server's error code (features/fleet/hooks.ts).
       await logExpense.mutateAsync({
         kind,
+        paidBy,
         amountPaise: Math.round(amt * 100),
         ...(form.riderId ? { riderId: form.riderId } : {}),
         ...(form.vehicleId ? { vehicleId: form.vehicleId } : {}),
@@ -281,6 +313,31 @@ export function ExpensesPage() {
                   ))}
                 </div>
               </div>
+              <div className="field" style={{ marginBottom: 16 }}>
+                <span className="field__label">
+                  Paid by <span className="req">*</span>
+                </span>
+                <div className="seg" role="radiogroup" aria-label="Who pays" style={{ width: "fit-content" }}>
+                  {PAYERS.map((p) => (
+                    // eslint-disable-next-line jsx-a11y/role-supports-aria-props
+                    <button key={p[0]} type="button" role="radio" aria-pressed={f.paidBy === p[0]} aria-checked={f.paidBy === p[0]} onClick={() => setSt({ form: { ...f, paidBy: p[0] }, err: {} })}>
+                      <Icon name={p[2]} size={15} />
+                      {p[1]}
+                    </button>
+                  ))}
+                </div>
+                <div className="field__hint" style={{ marginTop: 6 }}>
+                  {f.paidBy === "company"
+                    ? "Business expense — no rider needed."
+                    : f.paidBy === "rider"
+                      ? "Rider pays out of pocket; the amount appears in their financial history."
+                      : payerRider
+                        ? `${U.money(depositRemaining)} available from ${payerRider.name}'s security deposit${
+                            payerRider.deposit.status === "received" ? "" : " (no deposit held)"
+                          }.`
+                        : "Pick a rider with a held security deposit."}
+                </div>
+              </div>
               <div className="form-grid">
                 <Field id="ex-amount" label="Amount" req err={e.amount}>
                   <div className="input-prefix">
@@ -288,7 +345,21 @@ export function ExpensesPage() {
                     <input id="ex-amount" type="number" inputMode="decimal" min={1} step={1} value={f.amount} placeholder="0" onChange={(ev) => setForm({ amount: ev.target.value })} />
                   </div>
                 </Field>
-                <Field id="ex-rider" label="Related rider" req={f.type === "pending_deposit"} err={e.riderId} hint={f.type === "pending_deposit" ? null : "Adds an entry to this rider’s financial history"}>
+                <Field
+                  id="ex-rider"
+                  label="Related rider"
+                  req={f.type === "pending_deposit" || f.paidBy !== "company"}
+                  err={e.riderId}
+                  hint={
+                    f.type === "pending_deposit"
+                      ? null
+                      : f.paidBy === "company"
+                        ? "Optional — adds an entry to this rider’s financial history"
+                        : f.paidBy === "deposit"
+                          ? "The expense is deducted from this rider’s security deposit"
+                          : "The rider bears this expense"
+                  }
+                >
                   <select
                     className="select"
                     id="ex-rider"
@@ -358,6 +429,7 @@ export function ExpensesPage() {
                     <tr>
                       <th>Date</th>
                       <th>Type</th>
+                      <th>Paid by</th>
                       <th>Linked to</th>
                       <th className="num">Amount</th>
                     </tr>
@@ -374,6 +446,9 @@ export function ExpensesPage() {
                           <td>
                             <span className="cell-main">{L.expenseType[x.type]}</span>
                             <span className="cell-sub" style={{ whiteSpace: "normal" }}>{x.notes || "—"}</span>
+                          </td>
+                          <td>
+                            <Badge tone={PAYER_LABEL[x.paidBy][1]}>{PAYER_LABEL[x.paidBy][0]}</Badge>
                           </td>
                           <td>
                             {v ? <span className="cell-mono">{v.regNo}</span> : null}

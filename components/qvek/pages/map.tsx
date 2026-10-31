@@ -54,6 +54,9 @@ function MapSide() {
           </button>
         </div>
         <div className="card__body" style={{ display: "grid", gap: 12 }}>
+          <p className="cell-sub" style={{ margin: 0 }}>
+            IOP <span className="cell-mono">{v.iopId || "—"}</span>
+          </p>
           <div className="badge-row">
             <Badge tone={tone}>{KIND_LABEL[k]}</Badge>
             {s.hub ? (

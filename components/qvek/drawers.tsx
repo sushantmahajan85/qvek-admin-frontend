@@ -65,6 +65,8 @@ export function VehicleDrawerBody({ v, fin, onFin }: { v: Vehicle; fin: string; 
           <dd className="cell-mono">{v.controllerNo}</dd>
           <dt>Registration No.</dt>
           <dd><Plate v={v} /></dd>
+          <dt>IOP device ID</dt>
+          <dd className="cell-mono">{v.iopId || "—"}</dd>
           <dt>Model</dt>
           <dd>{v.model}</dd>
           <dt>Odometer</dt>
@@ -210,6 +212,18 @@ export function VehicleDrawerBody({ v, fin, onFin }: { v: Vehicle; fin: string; 
           )}
         </div>
       ) : null}
+
+      <div className="dsec">
+        <h3>Danger zone</h3>
+        <p className="field__hint" style={{ marginBottom: 10 }}>
+          Deleting removes this scooter from the fleet, map and alerts. It is refused while a rider holds it.
+          History is kept, and re-adding the same IOP ID restores the record.
+        </p>
+        <Button size="sm" variant="danger" onClick={() => admin.deleteVehicle(v.id)}>
+          <Icon name="trash" size={15} />
+          Delete vehicle
+        </Button>
+      </div>
     </>
   );
 }
@@ -329,6 +343,8 @@ export function RiderDrawerBody({ r, fin, onFin }: { r: Rider; fin: string; onFi
   const k = D.kycSummary(r);
   const st = appStage(r);
   const entries = D.financeFilter(s.finance.filter((e) => e.riderId === r.id), fin).sort((a, b) => b.at - a.at);
+  const depositUsed = r.deposit.used ?? 0;
+  const depositRemaining = Math.max(0, r.deposit.amount - depositUsed);
   const el = D.eligibility(r);
   const edits = r.edits || [];
   const purge = usePurgeRider(r.id);
@@ -356,7 +372,7 @@ export function RiderDrawerBody({ r, fin, onFin }: { r: Rider; fin: string; onFi
 
   const confirmRefund = () => {
     void (async () => {
-      const amount = r.deposit.amount || 0;
+      const amount = depositRemaining;
       const ok = await ui.confirm({
         title: `Refund ${U.money(amount)} deposit to ${r.name}?`,
         icon: "rupee",
@@ -405,7 +421,16 @@ export function RiderDrawerBody({ r, fin, onFin }: { r: Rider; fin: string; onFi
           </h3>
           <dl className="kv">
             <dt>Vehicle</dt>
-            <dd>{v ? <Plate v={v} /> : <span className="cell-sub">Returned / none</span>}</dd>
+            <dd>
+              {v ? (
+                <>
+                  <Plate v={v} />
+                  <span className="cell-sub" style={{ display: "block" }}>IOP {v.iopId || "—"}</span>
+                </>
+              ) : (
+                <span className="cell-sub">Returned / none</span>
+              )}
+            </dd>
             <dt>Deposit</dt>
             <dd>
               {r.deposit.status === "received" ? (
@@ -424,10 +449,10 @@ export function RiderDrawerBody({ r, fin, onFin }: { r: Rider; fin: string; onFi
                 {doReturn.isPending ? "Returning…" : "Mark vehicle returned"}
               </Button>
             ) : null}
-            {r.deposit.status === "received" ? (
+            {r.deposit.status === "received" && depositRemaining > 0 ? (
               <Button size="sm" variant="subtle" disabled={refund.isPending} onClick={confirmRefund}>
                 <Icon name="rupee" size={15} />
-                {refund.isPending ? "Recording…" : "Refund deposit"}
+                {refund.isPending ? "Recording…" : `Refund deposit (${U.money(depositRemaining)})`}
               </Button>
             ) : null}
           </div>
@@ -588,8 +613,19 @@ export function RiderDrawerBody({ r, fin, onFin }: { r: Rider; fin: string; onFi
         </h3>
         {r.deposit.status === "received" ? (
           <dl className="kv">
-            <dt>Amount</dt>
+            <dt>Collected</dt>
             <dd>{U.money(r.deposit.amount)}</dd>
+            {depositUsed > 0 ? (
+              <>
+                <dt>Used for expenses</dt>
+                <dd>{U.money(depositUsed)}</dd>
+                <dt>Remaining</dt>
+                <dd>
+                  {U.money(depositRemaining)}{" "}
+                  {depositRemaining === 0 ? <Badge tone="amber">Fully used</Badge> : null}
+                </dd>
+              </>
+            ) : null}
             <dt>Mode</dt>
             <dd>{r.deposit.mode === "online" ? "Paid online (in-app)" : "Offline — recorded by admin"}</dd>
             <dt>Date</dt>
@@ -664,6 +700,21 @@ export function RiderDrawerBody({ r, fin, onFin }: { r: Rider; fin: string; onFi
         )}
       </div>
       <TestPayments riderId={r.id} />
+
+      {!r.deletionRequestedAt ? (
+        <div className="dsec">
+          <h3>Danger zone</h3>
+          <p className="field__hint" style={{ marginBottom: 10 }}>
+            Deleting removes this rider from every list and blocks app login. Profile, KYC numbers,
+            documents, push tokens and sessions are erased; payment and rental rows are kept with
+            minimised identifiers. Blocked while a scooter is assigned or a deposit is still held.
+          </p>
+          <Button size="sm" variant="danger" onClick={() => admin.deleteRider(r.id)}>
+            <Icon name="trash" size={15} />
+            Delete rider
+          </Button>
+        </div>
+      ) : null}
     </>
   );
 }

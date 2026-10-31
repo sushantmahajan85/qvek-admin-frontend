@@ -59,6 +59,10 @@ export function VehiclesPage() {
           <p>The Chassis No. is the master record, linked to its Motor No. and Controller No. Replaced numbers stay in history.</p>
         </div>
         <div className="page-head__actions">
+          <Button onClick={() => admin.importVehicles()}>
+            <Icon name="upload" size={16} />
+            Import XLSX
+          </Button>
           <Button variant="primary" onClick={() => admin.addVehicle()}>
             <Icon name="plus" size={16} />
             Add vehicle
@@ -67,7 +71,7 @@ export function VehiclesPage() {
       </div>
       <section className="card">
         <div className="toolbar">
-          <SearchBox value={st.q} onChange={(q) => setSt({ q, page: 1 })} placeholder="Search vehicle, chassis, motor, controller or rider" />
+          <SearchBox value={st.q} onChange={(q) => setSt({ q, page: 1 })} placeholder="Search vehicle, IOP id, chassis, motor, controller or rider" />
           <div className="chip-filter" role="group" aria-label="Status filter">
             {opts.map((o) => (
               <button key={o[0]} type="button" aria-pressed={st.filter === o[0]} onClick={() => setSt({ filter: o[0], page: 1 })}>
@@ -87,12 +91,16 @@ export function VehiclesPage() {
                     <tr>
                       <SortTh label="Chassis No. (master)" sortKey="chassis" sort={st.sort} onSort={onSort} />
                       <SortTh label="Vehicle No." sortKey="reg" sort={st.sort} onSort={onSort} />
+                      <th>IOP ID</th>
                       <th>Motor No.</th>
                       <th>Controller No.</th>
                       <th>Status</th>
                       <th>Rider</th>
                       <SortTh label="Odometer" sortKey="odo" sort={st.sort} onSort={onSort} className="num" />
                       <SortTh label="Last GPS" sortKey="gps" sort={st.sort} onSort={onSort} />
+                      <th>
+                        <span className="sr-only">Actions</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -105,6 +113,9 @@ export function VehiclesPage() {
                           </td>
                           <td data-label="Vehicle No.">
                             <Plate v={v} />
+                          </td>
+                          <td data-label="IOP ID">
+                            <span className="cell-mono">{v.iopId || "—"}</span>
                           </td>
                           <td data-label="Motor No.">
                             <span className="cell-mono">{v.motorNo}</span>
@@ -133,6 +144,17 @@ export function VehiclesPage() {
                           </td>
                           <td data-label="Last GPS">
                             <GpsCell v={v} />
+                          </td>
+                          <td data-label="Actions" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              size="sm"
+                              variant="danger-ghost"
+                              aria-label={`Delete ${v.regNo}`}
+                              title={`Delete ${v.regNo}`}
+                              onClick={() => admin.deleteVehicle(v.id)}
+                            >
+                              <Icon name="trash" size={15} />
+                            </Button>
                           </td>
                         </tr>
                       );
@@ -297,7 +319,7 @@ export function AssignmentPage() {
                         <span className="pick__body">
                           <b>{x.regNo}</b>
                           <small>
-                            Chassis {x.chassisNo} · {U.km(x.odometer)}
+                            IOP {x.iopId || "—"} · Chassis {x.chassisNo} · {U.km(x.odometer)}
                           </small>
                         </span>
                         <AssetBadge status={x.status} />
@@ -316,6 +338,8 @@ export function AssignmentPage() {
                     <dd>
                       <Plate v={v} />
                     </dd>
+                    <dt>IOP device ID</dt>
+                    <dd className="cell-mono">{v.iopId || "—"}</dd>
                     <dt>Chassis No.</dt>
                     <dd className="cell-mono">{v.chassisNo}</dd>
                     <dt>Motor No.</dt>
@@ -507,7 +531,7 @@ export function ReplacementPage() {
                     {oldV ? (
                       <>
                         <Plate v={oldV} />
-                        <span className="cell-sub">{oldV.chassisNo}</span>
+                        <span className="cell-sub">{oldV.iopId ? `IOP ${oldV.iopId}` : ""} · {oldV.chassisNo}</span>
                       </>
                     ) : (
                       <span className="cell-sub">Auto-filled from rider</span>
@@ -527,7 +551,7 @@ export function ReplacementPage() {
                     <option value="">Select available vehicle</option>
                     {avail.map((v) => (
                       <option key={v.id} value={v.id}>
-                        {v.regNo} · {U.km(v.odometer)}
+                        {v.regNo} · IOP {v.iopId || "—"} · {U.km(v.odometer)}
                       </option>
                     ))}
                   </select>

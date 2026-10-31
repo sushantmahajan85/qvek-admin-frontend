@@ -100,7 +100,7 @@ export function OnboardingPage() {
                     <th>Deposit</th>
                     <th>Application</th>
                     <th>Source</th>
-                    <th style={{ width: 100 }}>
+                    <th style={{ width: 150 }}>
                       <span className="sr-only">Actions</span>
                     </th>
                   </tr>
@@ -156,10 +156,21 @@ export function OnboardingPage() {
                           {r.source === "admin" ? <Badge tone="violet" icon="user">Admin</Badge> : <Badge tone="grey" icon="smartphone">App</Badge>}
                         </td>
                         <td className="cell-full">
-                          <Button size="sm">
-                            {st === "pending" ? "Review" : "Open"}
-                            <Icon name="chevronRight" size={15} />
-                          </Button>
+                          <div className="actions-row" onClick={(e) => e.stopPropagation()}>
+                            <Button size="sm">
+                              {st === "pending" ? "Review" : "Open"}
+                              <Icon name="chevronRight" size={15} />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="danger-ghost"
+                              aria-label={`Delete ${r.name}`}
+                              title={`Delete ${r.name}`}
+                              onClick={() => admin.deleteRider(r.id)}
+                            >
+                              <Icon name="trash" size={15} />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -273,7 +284,7 @@ export function RidersPage() {
                       <th>Vehicle</th>
                       <th>Plan validity</th>
                       <th>Deposit</th>
-                      <th style={{ width: 120 }}>
+                      <th style={{ width: 170 }}>
                         <span className="sr-only">Actions</span>
                       </th>
                     </tr>
@@ -303,7 +314,16 @@ export function RidersPage() {
                               {r.grace && !r.grace.lapsed ? <Flag tone="amber" icon="hourglass">Grace</Flag> : null}
                             </div>
                           </td>
-                          <td data-label="Vehicle">{v ? <Plate v={v} /> : <span className="cell-sub">—</span>}</td>
+                          <td data-label="Vehicle">
+                            {v ? (
+                              <>
+                                <Plate v={v} />
+                                <span className="cell-sub" style={{ display: "block" }}>IOP {v.iopId || "—"}</span>
+                              </>
+                            ) : (
+                              <span className="cell-sub">—</span>
+                            )}
+                          </td>
                           <td data-label="Plan validity">
                             <PlanCell r={r} />
                           </td>
@@ -311,16 +331,27 @@ export function RidersPage() {
                             {r.deposit.status === "received" ? <Badge tone="green">Received</Badge> : r.deposit.status === "refunded" ? <Badge tone="violet">Refunded</Badge> : <Badge tone="amber">Pending</Badge>}
                           </td>
                           <td className="cell-full">
-                            <Button
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                admin.riderStatus(r.id);
-                              }}
-                            >
-                              <Icon name="flag" size={15} />
-                              Status
-                            </Button>
+                            <div className="actions-row" onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  admin.riderStatus(r.id);
+                                }}
+                              >
+                                <Icon name="flag" size={15} />
+                                Status
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="danger-ghost"
+                                aria-label={`Delete ${r.name}`}
+                                title={`Delete ${r.name}`}
+                                onClick={() => admin.deleteRider(r.id)}
+                              >
+                                <Icon name="trash" size={15} />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       );

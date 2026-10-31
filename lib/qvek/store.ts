@@ -9,7 +9,7 @@
  *
  * Nothing in here talks to the network and nothing is persisted.
  */
-import type { AssetStatus, Config, ExpenseType, KycKey, Rider, State, Vehicle, Zone, FinanceEntry } from "./types";
+import type { AssetStatus, Config, ExpenseType, KycKey, KycStatus, Rider, State, Vehicle, Zone, FinanceEntry } from "./types";
 import { U } from "./utils";
 
 export const DEFAULT_CONFIG: Config = {
@@ -111,11 +111,19 @@ export const D = {
           { kind: "pan", title: "PAN", required: true },
         ];
     const reqKeys = defs.filter((d) => d.required).map((d) => d.kind) as KycKey[];
-    const docs = reqKeys.map((k) => (r.kyc && r.kyc[k]) || { status: "missing" as const });
-    const verified = docs.filter((d) => d.status === "verified").length;
-    const submitted = docs.filter((d) => d.status !== "missing").length;
-    const dl = (r.kyc && r.kyc.dl) || { status: "missing" as const };
-    return { verified, submitted, total: reqKeys.length, complete: submitted === reqKeys.length, allVerified: verified === reqKeys.length, dlSubmitted: dl.status !== "missing" };
+    // A document counts as uploaded when either its masked number or its file is
+    // on record. The rider app uploads files only, so numbers alone undercounted.
+    const fileKinds = new Set((r.kycInfo?.docs ?? []).map((d) => d.kind.trim().toLowerCase()));
+    const statusOf = (kind: string): KycStatus => {
+      const byNumbers = (r.kyc as Record<string, { status?: KycStatus } | undefined>)?.[kind]?.status;
+      if (byNumbers && byNumbers !== "missing") return byNumbers;
+      if (fileKinds.has(kind.trim().toLowerCase())) return r.kycInfo?.verified ? "verified" : "submitted";
+      return "missing";
+    };
+    const docs = reqKeys.map((k) => statusOf(k));
+    const verified = docs.filter((d) => d === "verified").length;
+    const submitted = docs.filter((d) => d !== "missing").length;
+    return { verified, submitted, total: reqKeys.length, complete: submitted === reqKeys.length, allVerified: verified === reqKeys.length, dlSubmitted: statusOf("dl") !== "missing" };
   },
   availableVehicles() {
     return S().vehicles.filter((v) => !v.riderId && v.status === "Inactive");
@@ -140,7 +148,7 @@ export const store = {
 
 export const L = {
   assetStatus: { Inactive: "Inactive", Active: "Active", Marked_for_recovery: "Marked for recovery", Blacklisted: "Blacklisted", Returned: "Returned", Repair_req: "Repair required" } as Record<AssetStatus, string>,
-  finType: { deposit: "Security deposit", recharge: "Recharge", first_cycle: "Adjusted first cycle", service: "Service charge", repair: "Repair", servicing: "Servicing", refund: "Refund" } as Record<string, string>,
+  finType: { deposit: "Security deposit", recharge: "Recharge", first_cycle: "Adjusted first cycle", service: "Service charge", repair: "Repair", servicing: "Servicing", refund: "Refund", deposit_deduction: "Deposit used for expense" } as Record<string, string>,
   expenseType: { pending_deposit: "Pending security deposit", repair: "Repair expense", servicing: "Servicing expense" } as Record<ExpenseType, string>,
   platforms: ["Swiggy", "Zomato", "Zepto", "Blinkit", "Rapido", "Amazon Flex", "Dunzo", "Other"],
 };

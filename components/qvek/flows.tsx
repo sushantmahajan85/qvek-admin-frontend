@@ -10,7 +10,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { useUpdateRecord, useCreateVehicle, useDisarmVehicle, useReactivateVehicle } from "@/features/fleet/hooks";
+import { Button } from "@/components/ui/button";
+import { useBulkCreateVehicles, useUpdateRecord, useCreateVehicle, useDisarmVehicle, useReactivateVehicle } from "@/features/fleet/hooks";
+import type { BulkVehiclesResult } from "@/features/fleet/api";
+import { downloadTemplateXlsx, IMPORT_LIMIT, parseVehiclesFile, type ParsedImport } from "@/features/fleet/import";
 import { useUpsertKyc } from "@/features/kyc/hooks";
 import { useVerifyPayment } from "@/features/payments/hooks";
 import { kycSchema } from "@/features/kyc/api";
@@ -130,6 +133,12 @@ export function ApproveFlow({ id }: { id: string }) {
   const approve = useApproveRider(id);
   const k = D.kycSummary(r);
   const [paid, setPaid] = useState(false);
+  // The rider may already have paid the deposit in-app (Razorpay webhook sets
+  // paidToken + a VERIFIED DEPOSIT row). Then the admin must not mark it again —
+  // approve is allowed as-is and the server won't create a second deposit row.
+  const depositOnFile = r.deposit.status === "received";
+  const depositAmount = r.deposit.amount || store.state.config.deposit;
+  const canApprove = depositOnFile || paid;
   return (
     <Modal
       title={"Approve " + r.name + "?"}
@@ -142,12 +151,12 @@ export function ApproveFlow({ id }: { id: string }) {
           label: "Approve",
           kind: "primary",
           icon: "check",
-          disabled: !paid,
+          disabled: !canApprove,
           busy: approve.isPending ? "Approving…" : undefined,
           onClick: async () => {
             try {
-              // The hook toasts success / the server's error code (features/riders/hooks.ts).
-              await approve.mutateAsync(true);
+              // markOffline=false when the deposit is already on file (in-app payment).
+              await approve.mutateAsync(!depositOnFile);
             } catch {
               return false;
             }
@@ -160,17 +169,33 @@ export function ApproveFlow({ id }: { id: string }) {
           <span className="tick"><Icon name={k.complete || k.submitted > 0 ? "check" : "x"} size={14} /></span>
           {k.complete ? "KYC documents reviewed (" + k.total + "/" + k.total + " required)" : k.submitted > 0 ? "KYC details on file (" + k.submitted + "/" + k.total + " required)" : "No KYC details on file"}
         </li>
-        <li className={paid ? "ok" : "no"}>
-          <span className="tick"><Icon name={paid ? "check" : "x"} size={14} /></span>Deposit + first week rent collected offline
+        <li className={canApprove ? "ok" : "no"}>
+          <span className="tick"><Icon name={canApprove ? "check" : "x"} size={14} /></span>
+          {depositOnFile
+            ? `Security deposit already received (${U.money(depositAmount)})`
+            : "Deposit + first week rent collected offline"}
         </li>
       </ul>
-      <div className="notice notice--warn" style={{ marginTop: 12 }}>
-        <Icon name="alert" size={16} />
-        <span>Approval confirms the {U.money(store.state.config.deposit)} security deposit and the first week&apos;s rent were collected offline. It unlocks the rider app.</span>
-      </div>
-      <label className="check" style={{ marginTop: 12 }}>
-        <input type="checkbox" id="ap-paid" checked={paid} onChange={(e) => setPaid(e.target.checked)} /> Paid token collected
-      </label>
+      {depositOnFile ? (
+        <div className="notice notice--info" style={{ marginTop: 12 }}>
+          <Icon name="checkCircle" size={16} />
+          <span>
+            The {U.money(depositAmount)} deposit is already on record (paid in the app or recorded
+            earlier). Approving now does not create a second deposit entry — nothing needs to be marked
+            offline.
+          </span>
+        </div>
+      ) : (
+        <>
+          <div className="notice notice--warn" style={{ marginTop: 12 }}>
+            <Icon name="alert" size={16} />
+            <span>Approval confirms the {U.money(store.state.config.deposit)} security deposit and the first week&apos;s rent were collected offline. It unlocks the rider app.</span>
+          </div>
+          <label className="check" style={{ marginTop: 12 }}>
+            <input type="checkbox" id="ap-paid" checked={paid} onChange={(e) => setPaid(e.target.checked)} /> Deposit collected offline
+          </label>
+        </>
+      )}
       <p style={{ marginTop: 12 }}>The rider keeps the Customer ID they were issued at sign-up.</p>
     </Modal>
   );
@@ -471,6 +496,223 @@ export function AddVehicleFlow() {
           </div>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+/* ---------------------------------------------------------------- bulk import (XLSX / CSV) */
+export function BulkAddVehiclesFlow() {
+  const bulk = useBulkCreateVehicles();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [fileName, setFileName] = useState("");
+  const [parsed, setParsed] = useState<ParsedImport | null>(null);
+  const [result, setResult] = useState<BulkVehiclesResult | null>(null);
+  const [error, setError] = useState("");
+  const [reading, setReading] = useState(false);
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return;
+    setReading(true);
+    setError("");
+    setResult(null);
+    setParsed(null);
+    try {
+      const p = await parseVehiclesFile(file);
+      setParsed(p);
+      setFileName(file.name);
+    } catch (e) {
+      setError((e as Error).message || "Could not read that file.");
+      setFileName(file.name);
+    } finally {
+      setReading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  const saveTemplate = async () => {
+    setError("");
+    try {
+      await downloadTemplateXlsx();
+    } catch {
+      setError("Could not build the template file. Check your browser's download permissions and retry.");
+    }
+  };
+
+  const runImport = async () => {
+    if (!parsed?.rows.length) return false;
+    try {
+      const d = await bulk.mutateAsync(parsed.rows.map(({ row: _row, ...rest }) => rest));
+      setResult(d);
+    } catch {
+      /* surfaced by the hook's onError toast */
+    }
+    return false; // keep the dialog open to show per-row results
+  };
+
+  const done = result ? result.created + result.restored : 0;
+  const skipped = result?.results.filter((r) => r.status === "skipped") ?? [];
+
+  return (
+    <Modal
+      title="Import vehicles"
+      subtitle="Upload an XLSX or CSV sheet — validated before anything is saved"
+      icon="upload"
+      size="lg"
+      actions={
+        result
+          ? [{ label: "Done", kind: "primary", icon: "check" }]
+          : [
+              { label: "Close", kind: "ghost" },
+              ...(parsed?.rows.length
+                ? [
+                    {
+                      label: `Import ${parsed.rows.length} vehicle${parsed.rows.length === 1 ? "" : "s"}`,
+                      kind: "primary" as const,
+                      icon: "upload",
+                      close: false,
+                      busy: bulk.isPending ? "Importing…" : undefined,
+                      onClick: runImport,
+                    },
+                  ]
+                : []),
+            ]
+      }
+    >
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".xlsx,.csv,text/csv"
+        className="sr-only"
+        onChange={(e) => void onFile(e.target.files?.[0])}
+      />
+
+      {result ? (
+        <>
+          <div className="empty" style={{ paddingBottom: 8 }}>
+            <span className="empty__icon"><Icon name="fileCheck" size={24} /></span>
+            <b>{done} vehicle{done === 1 ? "" : "s"} imported</b>
+            <p>
+              {result.created} added
+              {result.restored ? ` · ${result.restored} restored from deleted records` : ""}
+              {result.skipped ? ` · ${result.skipped} skipped` : ""}
+            </p>
+          </div>
+          {skipped.length ? (
+            <div className="table-wrap" style={{ maxHeight: 280, overflowY: "auto" }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Row</th>
+                    <th>Vehicle No.</th>
+                    <th>IOP ID</th>
+                    <th>Why it was skipped</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {skipped.map((r) => (
+                    <tr key={`${r.index}-${r.vehicleNo}`}>
+                      <td className="num">{r.index + 1}</td>
+                      <td className="cell-mono">{r.vehicleNo}</td>
+                      <td className="cell-mono">{r.iopId}</td>
+                      <td>{r.message ?? r.code ?? "Duplicate"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="field__hint">Every row was imported. No duplicates found.</p>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="card" style={{ padding: 16, marginBottom: 14 }}>
+            <p style={{ marginBottom: 6 }}>
+              <b>Required:</b> <span className="cell-mono">Vehicle No.</span> and <span className="cell-mono">IOP ID</span>
+            </p>
+            <p className="cell-sub" style={{ marginBottom: 10 }}>
+              Optional: Chassis No., Motor No., Controller No., Type. Up to {IMPORT_LIMIT} rows per import.
+              The header row can be anywhere in the first 10 rows.
+            </p>
+            <div className="table-wrap" style={{ marginBottom: 12 }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Column</th>
+                    <th>Required</th>
+                    <th>Example</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td className="cell-mono">Vehicle No.</td><td>Yes</td><td className="cell-mono">QVEK-001</td></tr>
+                  <tr><td className="cell-mono">IOP ID</td><td>Yes</td><td className="cell-mono">IOP-10001</td></tr>
+                  <tr><td className="cell-mono">Chassis No.</td><td className="cell-sub">Optional</td><td className="cell-mono">CH-10001</td></tr>
+                  <tr><td className="cell-mono">Motor No.</td><td className="cell-sub">Optional</td><td className="cell-mono">MT-10001</td></tr>
+                  <tr><td className="cell-mono">Controller No.</td><td className="cell-sub">Optional</td><td className="cell-mono">CT-10001</td></tr>
+                  <tr><td className="cell-mono">Type</td><td className="cell-sub">Optional</td><td className="cell-mono">LIGHT_2W</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div className="actions-row">
+              <Button variant="primary" onClick={() => void saveTemplate()} disabled={reading}>
+                <Icon name="file" size={16} />
+                Download XLSX template
+              </Button>
+              <Button onClick={() => fileRef.current?.click()} disabled={reading}>
+                <Icon name="upload" size={16} />
+                {reading ? "Reading…" : "Upload filled sheet"}
+              </Button>
+            </div>
+            <p className="field__hint" style={{ marginTop: 8 }}>
+              The template contains these exact headers plus a field guide on its second sheet. If an IOP ID
+              starts with 0, format that Excel column as Text so the leading zero is kept.
+            </p>
+            {fileName ? <p className="field__hint" style={{ marginTop: 10 }}>{fileName}</p> : null}
+          </div>
+
+          {error ? <FieldError style={{ marginBottom: 12 }}>{error}</FieldError> : null}
+
+          {parsed ? (
+            <>
+              <div className="badge-row" style={{ marginBottom: 10 }}>
+                <Badge tone="grey">{parsed.total} rows read</Badge>
+                <Badge tone={parsed.rows.length ? "green" : "grey"}>{parsed.rows.length} ready</Badge>
+                {parsed.issues.length ? <Badge tone="amber">{parsed.issues.length} with problems</Badge> : null}
+              </div>
+              {parsed.issues.length ? (
+                <div className="table-wrap" style={{ maxHeight: 240, overflowY: "auto" }}>
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Row</th>
+                        <th>Vehicle No.</th>
+                        <th>IOP ID</th>
+                        <th>Problem</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parsed.issues.map((i) => (
+                        <tr key={`${i.row}-${i.message}`}>
+                          <td className="num">{i.row}</td>
+                          <td className="cell-mono">{i.vehicleNo || "—"}</td>
+                          <td className="cell-mono">{i.iopId || "—"}</td>
+                          <td>{i.message}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="field__hint">No problems found in the sheet.</p>
+              )}
+              <p className="field__hint" style={{ marginTop: 10 }}>
+                Rows with problems are left out. IOP IDs that already exist in the fleet are reported after
+                import — they are never overwritten. Deleted vehicles are restored when re-added.
+              </p>
+            </>
+          ) : null}
+        </>
+      )}
     </Modal>
   );
 }

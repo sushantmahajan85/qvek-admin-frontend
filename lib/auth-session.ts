@@ -39,7 +39,8 @@ export function setSession(access: string, refresh: string) {
   } catch {
     /* private mode — session lasts for the tab only */
   }
-  document.cookie = 'qvek_admin=1; path=/; max-age=604800; SameSite=Lax';
+  // Keep the middleware cookie alive for the whole admin refresh lifetime (30d).
+  document.cookie = `qvek_admin=1; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
 }
 
 export function clearSession() {

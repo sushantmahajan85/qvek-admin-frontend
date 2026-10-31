@@ -12,9 +12,10 @@ import { toast } from "@/lib/toast";
 import { signOut } from "@/lib/qvek/auth";
 import { patchPageState } from "@/lib/qvek/page-state";
 import { G, store } from "@/lib/qvek/store";
+import { U } from "@/lib/qvek/utils";
 import { useStore } from "@/lib/qvek/use-store";
-import { transitionRider } from "@/features/riders/api";
-import { reactivateVehicle } from "@/features/fleet/api";
+import { deleteRider as deleteRiderRequest, transitionRider } from "@/features/riders/api";
+import { reactivateVehicle, removeVehicle } from "@/features/fleet/api";
 import { AdminContext, type AdminApi } from "./admin-context";
 import { AssetBadge, VFlags } from "./bits";
 import { Drawer } from "./drawer";
@@ -22,6 +23,7 @@ import { RiderDrawerBody, VehicleDrawerBody } from "./drawers";
 import {
   AddRiderFlow,
   AddVehicleFlow,
+  BulkAddVehiclesFlow,
   ApproveFlow,
   ComponentsFlow,
   ControlFlow,
@@ -43,6 +45,16 @@ interface DrawerState {
   fin: string;
   closing: boolean;
 }
+
+/**
+ * Idle logout. Admins work a full shift, so the default is 8 hours (was 30 min).
+ * Tune per deployment with NEXT_PUBLIC_ADMIN_IDLE_MINUTES — set it to 30 on a
+ * shared/public terminal.
+ */
+const IDLE_MINUTES = (() => {
+  const n = Number(process.env.NEXT_PUBLIC_ADMIN_IDLE_MINUTES);
+  return Number.isFinite(n) && n > 0 ? n : 8 * 60;
+})();
 
 /** Owns the vehicle / rider drawer and exposes every cross-page admin action. */
 export function AdminProvider({ children }: { children: ReactNode }) {
@@ -68,7 +80,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         signOut();
         qc.clear();
         router.replace('/login');
-      }, 30 * 60 * 1000);
+      }, IDLE_MINUTES * 60 * 1000);
     };
     kick();
     const evts = ['pointerdown', 'keydown', 'scroll', 'touchstart'] as const;
@@ -163,7 +175,99 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       vehicleStatus: (id) => void ui.open(<StatusFlow kind="vehicle" id={id} />),
       editComponents: (id) => void ui.open(<ComponentsFlow id={id} />),
       addRider: () => void ui.open(<AddRiderFlow onAdded={openRider} />),
+      async deleteRider(riderId) {
+        const r = G.rider(riderId);
+        if (!r) return;
+        const v = G.riderVehicle(r);
+        const depositHeld = r.deposit.status === "received";
+        if (v || depositHeld) {
+          const why = [
+            v ? `scooter ${v.regNo} is still assigned` : "",
+            depositHeld ? `${U.money(r.deposit.amount)} deposit is still held` : "",
+          ]
+            .filter(Boolean)
+            .join(" and ");
+          toast.error(`Cannot delete ${r.name} — ${why}. Use Return & settlement in the rider drawer first.`);
+          return;
+        }
+        const ok = await ui.confirm({
+          title: `Delete ${r.name}?`,
+          icon: "trash",
+          kind: "danger",
+          confirmLabel: "Delete rider",
+          confirmIcon: "trash",
+          body: (
+            <>
+              <p>
+                This removes the rider from every list and blocks app login. It cannot be undone.
+              </p>
+              <dl className="kv" style={{ marginTop: 10 }}>
+                <dt>Deleted</dt>
+                <dd>Profile, KYC numbers, uploaded documents, push tokens and sessions</dd>
+                <dt>Retained</dt>
+                <dd>Payment, expense and rental rows with minimised identifiers (tax and disputes)</dd>
+              </dl>
+              <p style={{ marginTop: 10 }}>The action is audited as <b>RIDER_PURGE</b>.</p>
+            </>
+          ),
+        });
+        if (!ok) return;
+        try {
+          await deleteRiderRequest(riderId);
+        } catch (e) {
+          toast.error(errorText(e instanceof ApiError ? e.code : undefined));
+          return;
+        }
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: ["riders"] }),
+          qc.invalidateQueries({ queryKey: ["rider", riderId] }),
+          qc.invalidateQueries({ queryKey: ["fleet"] }),
+          qc.invalidateQueries({ queryKey: ["timeline"] }),
+          qc.invalidateQueries({ queryKey: ["dashboard"] }),
+        ]);
+        closeDrawer();
+        ui.toast(`${r.name} deleted — personal data removed`, { title: "Rider deleted" });
+      },
       addVehicle: () => void ui.open(<AddVehicleFlow />),
+      importVehicles: () => void ui.open(<BulkAddVehiclesFlow />),
+      async deleteVehicle(vehicleId) {
+        const v = G.vehicle(vehicleId);
+        if (!v) return;
+        const ok = await ui.confirm({
+          title: `Delete ${v.regNo}?`,
+          icon: "trash",
+          kind: "danger",
+          body: (
+            <>
+              <p>
+                <b>{v.regNo}</b> will be removed from the fleet, assignments, maps and alerts.
+              </p>
+              <p style={{ marginTop: 8 }}>
+                Blocked while a rider holds the scooter — return it first. History stays in the records, and
+                re-importing the same IOP ID restores this vehicle instead of creating a duplicate.
+              </p>
+            </>
+          ),
+          confirmLabel: "Delete vehicle",
+          confirmIcon: "trash",
+        });
+        if (!ok) return;
+        try {
+          await removeVehicle(vehicleId);
+        } catch (e) {
+          toast.error(errorText(e instanceof ApiError ? e.code : undefined));
+          return;
+        }
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: ["fleet"] }),
+          qc.invalidateQueries({ queryKey: ["vehicles"] }),
+          qc.invalidateQueries({ queryKey: ["admin-map"] }),
+          qc.invalidateQueries({ queryKey: ["fleet-health"] }),
+          qc.invalidateQueries({ queryKey: ["audit-logs"] }),
+        ]);
+        closeDrawer();
+        ui.toast(`${v.regNo} removed from the fleet`, { title: "Vehicle deleted" });
+      },
       finDetail: (id) => void ui.open(<FinDetailFlow id={id} onOpenRider={openRider} />),
 
       goReplace(riderId) {

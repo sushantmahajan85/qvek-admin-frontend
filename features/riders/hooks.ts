@@ -8,7 +8,9 @@ import type { RiderStatus } from '@/lib/constants';
 import { approveRider, cancelRiderDeletion, createRider, getRider, listRiders, purgeRider, refundRiderDeposit, rejectRider, returnRiderVehicle, riderKeys, transitionRider, updateRider, type ReturnResult, type UpdateRiderInput } from './api';
 
 export function useRiders(q: string) {
-  return useQuery({ queryKey: riderKeys.list(q), queryFn: () => listRiders(q) });
+  // Poll so an in-app Razorpay deposit appears on the review queue / approve
+  // dialog without an admin refresh (the webhook flips paidToken server-side).
+  return useQuery({ queryKey: riderKeys.list(q), queryFn: () => listRiders(q), refetchInterval: 60_000 });
 }
 
 export function useRider(id: string) {

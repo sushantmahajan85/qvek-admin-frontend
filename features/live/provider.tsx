@@ -57,6 +57,9 @@ export function LiveDataProvider({ children }: { children: React.ReactNode }) {
       queryKey: kycKeys.one(id),
       queryFn: () => getKycOrNull(id),
       staleTime: REFRESH_MS,
+      // Keep the review queue live: a rider can upload while the admin sits on
+      // the page, and there is no cross-user push for KYC.
+      refetchInterval: REFRESH_MS,
       retry: false,
     })),
   });

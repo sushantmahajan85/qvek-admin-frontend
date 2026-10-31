@@ -6,6 +6,7 @@ import { ApiError } from '@/lib/api-client';
 import { errorText } from '@/lib/error-map';
 import {
   assignVehicle,
+  bulkCreateVehicles,
   createVehicle,
   disarmVehicle,
   getAdminMap,
@@ -26,6 +27,7 @@ import {
   replaceVehicle,
   updateRecord,
   type AssignInput,
+  type BulkVehiclesResult,
   type ExpenseInput,
   type ReplaceInput,
   type VehicleInput,
@@ -56,6 +58,22 @@ export function useCreateVehicle() {
       qc.invalidateQueries({ queryKey: ['vehicles'] });
       qc.invalidateQueries({ queryKey: ['fleet'] });
       toast.success('Vehicle added');
+    },
+    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+  });
+}
+
+export function useBulkCreateVehicles() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (rows: VehicleInput[]) => bulkCreateVehicles(rows),
+    onSuccess: (d: BulkVehiclesResult) => {
+      qc.invalidateQueries({ queryKey: ['vehicles'] });
+      qc.invalidateQueries({ queryKey: ['fleet'] });
+      qc.invalidateQueries({ queryKey: ['admin-map'] });
+      qc.invalidateQueries({ queryKey: ['fleet-health'] });
+      const done = d.created + d.restored;
+      toast.success(`${done} vehicle${done === 1 ? '' : 's'} imported${d.skipped ? ` — ${d.skipped} skipped` : ''}`);
     },
     onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
   });

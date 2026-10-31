@@ -3,6 +3,8 @@ import { apiGet, apiPut } from '@/lib/api-client';
 export interface SupportConfig {
   callNumber: string | null;
   whatsappNumber: string | null;
+  /** Authoritative admin-facing price (paise/day); plans are derived from it. */
+  dailyRentPaise: number;
   weeklyRentPaise: number;
   plans: Record<string, number>;
   depositPaise: number;
@@ -46,6 +48,7 @@ export async function setZones(input: ZonesInput): Promise<ZonesConfig> {
 }
 
 export interface PricingInput {
+  dailyPaise?: number;
   weeklyPaise?: number;
   fortnightlyPaise?: number;
   fourWeeklyPaise?: number;
