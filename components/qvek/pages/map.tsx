@@ -170,7 +170,12 @@ export function MapPage() {
   const n = (k: "all" | VKind) => (k === "all" ? s.vehicles.length : s.vehicles.filter((v) => vKind(v) === k).length);
   const vs = s.vehicles.filter((v) => m.filter === "all" || vKind(v) === m.filter);
   const sel = vs.find((v) => v.id === m.sel);
-  const visibleIds = useMemo(() => new Set(vs.map((v) => v.id)), [vs]);
+  // Dependency is a stable string key, not the array: `vs` is rebuilt on every
+  // render (30s auto-refresh, 60s refetch), which used to produce a fresh Set →
+  // fresh pins array → new `center` object → GoogleMap re-centred the map while
+  // the admin was dragging it.
+  const visibleKey = vs.map((v) => v.id).join(',');
+  const visibleIds = useMemo(() => new Set(visibleKey ? visibleKey.split(',') : []), [visibleKey]);
 
   const select = (id: string) => {
     setM({ sel: id || null });

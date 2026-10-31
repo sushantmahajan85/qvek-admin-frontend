@@ -58,11 +58,30 @@ export function FleetGoogleMap({
     () => (data?.vehicles ?? []).filter((v) => v.lat != null && v.lng != null && visibleIds.has(v.id)),
     [data, visibleIds],
   );
-  const center = React.useMemo<{ lat: number; lng: number }>(() => {
-    if (data?.shop) return { lat: data.shop.lat, lng: data.shop.lng };
+  // GoogleMap calls map.setCenter() whenever the `center` prop changes identity.
+  // Computing a new object each render re-centred the map mid-drag whenever the
+  // 30s auto-refresh / 60s refetch happened. Keep one stable object: set it on
+  // first data, and only replace it when the configured hub actually moves.
+  const [center, setCenter] = React.useState<{ lat: number; lng: number } | null>(null);
+  const appliedShopKey = React.useRef<string>('');
+  React.useEffect(() => {
+    if (!data) return;
+    const shopKey = data.shop ? `${data.shop.lat},${data.shop.lng}` : '';
+    const isFirst = center === null;
+    const shopMoved = shopKey !== appliedShopKey.current;
+    if (!isFirst && !shopMoved) return;
+    appliedShopKey.current = shopKey;
+    if (data.shop) {
+      setCenter({ lat: data.shop.lat, lng: data.shop.lng });
+      return;
+    }
     const p = pins[0];
-    if (p?.lat != null && p?.lng != null) return { lat: p.lat, lng: p.lng };
-    return { lat: 28.6139, lng: 77.209 };
+    setCenter(
+      p?.lat != null && p?.lng != null
+        ? { lat: p.lat, lng: p.lng }
+        : { lat: 28.6139, lng: 77.209 },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, pins]);
 
   if (!API_KEY) {
@@ -95,7 +114,7 @@ export function FleetGoogleMap({
       </div>
     );
   }
-  if (map.isLoading || !isLoaded) {
+  if (map.isLoading || !isLoaded || !center) {
     return (
       <div className="map-stage" style={{ display: 'grid', placeItems: 'center' }}>
         <span className="spinner" />
