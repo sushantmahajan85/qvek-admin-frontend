@@ -13,9 +13,10 @@ import { D, G, store } from "@/lib/qvek/store";
 import { ZONE_BADGE, appStage, locText } from "@/lib/qvek/selectors";
 import type { HistoryType, KycKey, Rider, Vehicle } from "@/lib/qvek/types";
 import { U } from "@/lib/qvek/utils";
+import { kycTileModels } from "@/lib/qvek/kyc-tiles";
 import { useAdmin } from "./admin-context";
 import { AssetBadge, ControlButton, FinFilterSeg, FinRow, Plate, PlanStateBadge, RiderLink } from "./bits";
-import { DOC_TITLES, DocSvg } from "./doc-svg";
+import { DocSvg } from "./doc-svg";
 import { useUI } from "./ui-context";
 import { Icon } from "./icon";
 import { MiniMap } from "./map-parts";
@@ -228,68 +229,67 @@ export function VehicleDrawerBody({ v, fin, onFin }: { v: Vehicle; fin: string; 
   );
 }
 
-const KNOWN_DOCS: Record<string, true> = { aadhaar: true, pan: true, dl: true };
 
 export function DocTiles({ r }: { r: Rider }) {
   const admin = useAdmin();
-  // Server-driven doc list (App content → KYC documents); unknown kinds render generically.
-  const defs = store.state.config.kycDocs.length
-    ? store.state.config.kycDocs
-    : [
-        { kind: "aadhaar", title: "Aadhaar", required: true },
-        { kind: "pan", title: "PAN", required: true },
-        { kind: "dl", title: "Driving Licence", required: false },
-      ];
-  const fileFor = (kind: string) => r.kycInfo?.docs.find((d) => d.kind === kind) ?? null;
+  // Server-driven doc list (App content → KYC documents); unknown kinds render
+  // generically. Labelling/fallback rules live in lib/qvek/kyc-tiles.ts.
+  const tiles = kycTileModels(r, store.state.config.kycDocs);
   return (
     <div className="doc-grid">
-      {defs.map((def) => {
-        const k = def.kind as KycKey;
-        const known = !!KNOWN_DOCS[def.kind];
-        const d = (known ? r.kyc[k] : undefined) || { status: "missing" as const };
-        const file = fileFor(def.kind);
-        const title = (known && DOC_TITLES[k]) || def.title;
-        if (d.status === "missing" && !file) {
+      {tiles.map((tile) => {
+        const badge =
+          tile.status === "verified" ? (
+            <Badge tone="green">Verified</Badge>
+          ) : tile.status === "submitted" ? (
+            <Badge tone="amber">Submitted</Badge>
+          ) : tile.required ? (
+            <Badge tone="red">Missing</Badge>
+          ) : (
+            <Badge tone="grey">Optional</Badge>
+          );
+
+        if (tile.status === "missing" && !tile.fileUrl) {
           return (
-            <div key={def.kind} className="doc doc--missing">
+            <div key={tile.kind} className="doc doc--missing">
               <div className="doc__thumb"><Icon name="file" size={26} /></div>
               <div className="doc__meta">
-                <b>{title}</b>
-                {def.required ? <Badge tone="red">Missing</Badge> : <Badge tone="grey">Optional</Badge>}
+                <b>{tile.title}</b>
+                {badge}
               </div>
             </div>
           );
         }
-        if (!known) {
-          // Future doc kinds: open the uploaded file directly (no preview modal yet).
+
+        if (!tile.known) {
+          // Custom kinds: open the uploaded file directly (no preview modal yet).
           return (
-            <a key={def.kind} className="doc" href={file?.url} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
+            <a key={tile.kind} className="doc" href={tile.fileUrl} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
               <div className="doc__thumb"><Icon name="image" size={26} /></div>
               <div className="doc__meta">
-                <b>{title}</b>
-                <small>{file?.name ?? "Uploaded"}</small>
-                {d.status === "verified" ? <Badge tone="green">Verified</Badge> : <Badge tone="amber">Submitted</Badge>}
+                <b>{tile.title}</b>
+                <small>{tile.fileName ?? "Uploaded"}</small>
+                {badge}
               </div>
             </a>
           );
         }
+
         return (
-          <button key={def.kind} type="button" className="doc" onClick={() => admin.viewDoc(r.id, k)}>
+          <button key={tile.kind} type="button" className="doc" onClick={() => admin.viewDoc(r.id, tile.kind as KycKey)}>
             <div className="doc__thumb">
-              {file ? (
+              {tile.fileUrl ? (
                 // Real uploaded file; the signed URL loads the thumbnail itself.
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={file.url} alt={title} loading="lazy" />
-              ) : d.sample ? (
-                <DocSvg kind={k} name={r.name} phone={r.phone} />
+                <img src={tile.fileUrl} alt={tile.title} loading="lazy" />
               ) : (
                 <Icon name="image" size={26} />
               )}
             </div>
             <div className="doc__meta">
-              <b>{title}</b>
-              <small>{file?.name ?? d.file ?? "Uploaded"}</small>
-              {d.status === "verified" ? <Badge tone="green">Verified</Badge> : <Badge tone="amber">Submitted</Badge>}
+              <b>{tile.title}</b>
+              <small>{tile.fileName ?? "Uploaded"}</small>
+              {badge}
             </div>
           </button>
         );
@@ -594,16 +594,7 @@ export function RiderDrawerBody({ r, fin, onFin }: { r: Rider; fin: string; onFi
             Name on KYC: <b style={{ color: "var(--text)" }}>{r.kycInfo.fullName}</b>
           </p>
         ) : null}
-        {r.kycInfo?.docs.length ? (
-          <div className="actions-row" style={{ marginTop: 8 }}>
-            {r.kycInfo.docs.map((d) => (
-              <a key={d.key} className="link" href={d.url} target="_blank" rel="noreferrer">
-                {d.key.split("/").pop()}
-              </a>
-            ))}
-          </div>
-        ) : null}
-        <p className="field__hint" style={{ marginTop: 8 }}>Only the last 4 digits are stored. Uploaded file links expire after 5 minutes.</p>
+        <p className="field__hint" style={{ marginTop: 8 }}>Only the last 4 digits of the number are stored. Click a card to open the uploaded file.</p>
       </div>
 
       <div className="dsec">
@@ -635,7 +626,7 @@ export function RiderDrawerBody({ r, fin, onFin }: { r: Rider; fin: string; onFi
           <p className="cell-sub">Deposit refunded after return.</p>
         ) : (
           <p style={{ color: "var(--text-2)", fontSize: 13 }}>
-            Required amount: <b>{U.money(s.config.deposit)}</b>, collected offline with the first week&apos;s rent. It is recorded when the application is approved.
+            Required amount: <b>{U.money(s.config.deposit)}</b>, collected offline or User can Pay online. It is recorded when the application is approved.
           </p>
         )}
       </div>
