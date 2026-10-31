@@ -8,6 +8,28 @@ const apiOrigin = (() => {
     return "http://localhost:8000";
   }
 })();
+// KYC document thumbnails are presigned S3 URLs. CSP is origin-based, so the
+// storage origin must be allowed explicitly or the browser blocks the <img>
+// (the tag is in the DOM but nothing renders). Override/extend with
+// MEDIA_ORIGIN="https://cdn.example.com,https://minio.internal"
+// for non-AWS storage.
+const mediaOrigins = (process.env.MEDIA_ORIGIN ?? process.env.NEXT_PUBLIC_MEDIA_ORIGIN ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+const imgSrc = [
+  "'self'",
+  "data:",
+  "blob:",
+  // Google Maps tiles, markers + fonts.
+  "https://*.googleapis.com",
+  "https://*.gstatic.com",
+  "https://maps.gstatic.com",
+  // KYC documents / rider uploads (any S3 bucket or region, and presigned URLs).
+  "https://*.amazonaws.com",
+  ...mediaOrigins,
+].join(" ");
+
 const nextConfig = {
   reactStrictMode: true,
   async headers() {
@@ -25,8 +47,7 @@ const nextConfig = {
               // 'unsafe-eval' only for `next dev` (HMR/webpack). Production stays strict.
               "script-src 'self' 'unsafe-inline' https://maps.googleapis.com" + (isProd ? "" : " 'unsafe-eval'"),
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              // Google Maps tiles, markers + fonts.
-              "img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://maps.gstatic.com",
+              "img-src " + imgSrc,
               "font-src 'self' https://fonts.gstatic.com",
               "connect-src 'self' " + apiOrigin + " https://maps.googleapis.com",
               "worker-src 'self' blob:",
