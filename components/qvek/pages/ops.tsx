@@ -18,7 +18,7 @@ import { Icon } from "../icon";
 // import { OpsAccessCard, OpsTimingsCard, PricingCard, SupportCard, ZonesCard } from "../settings-cards";
 import { PricingCard, SupportCard, ZonesCard } from "../settings-cards";
 import { MiniMap } from "../map-parts";
-import { useSetupMfa } from "@/features/auth/hooks";
+import { useConfirmMfa, useDisableMfa, useMfaStatus, useSetupMfa } from "@/features/auth/hooks";
 import { mockCaptureEnabled } from "@/features/payments/hooks";
 import { useAuditLogs, usePollFleet, useReconcile } from "@/features/fleet/hooks";
 import { useAlerts } from "@/features/alerts/hooks";
@@ -518,8 +518,42 @@ export function ControlsPage() {
 }
 
 function MfaCard() {
+  const status = useMfaStatus(true);
   const setup = useSetupMfa();
-  const [url, setUrl] = useState<string | null>(null);
+  const confirm = useConfirmMfa();
+  const disable = useDisableMfa();
+  const [pending, setPending] = useState<{ secret: string; otpauthUrl: string } | null>(null);
+  const [code, setCode] = useState("");
+  const [disableCode, setDisableCode] = useState("");
+  const enabled = status.data?.enabled ?? false;
+
+  const startSetup = () =>
+    setup.mutate(undefined, {
+      onSuccess: (d) => {
+        setPending(d);
+        setCode("");
+      },
+    });
+  const confirmSetup = () => {
+    if (!/^\d{6}$/.test(code)) return;
+    confirm.mutate(code, {
+      onSuccess: () => {
+        setPending(null);
+        setCode("");
+        status.refetch();
+      },
+    });
+  };
+  const disableMfa = () => {
+    if (!/^\d{6}$/.test(disableCode)) return;
+    disable.mutate(disableCode, {
+      onSuccess: () => {
+        setDisableCode("");
+        status.refetch();
+      },
+    });
+  };
+
   return (
     <section className="card">
       <div className="card__head">
@@ -527,27 +561,85 @@ function MfaCard() {
           <Icon name="shield" size={16} />
           Two-factor authentication
         </h2>
+        {status.data ? <Badge tone={enabled ? "green" : "grey"}>{enabled ? "Enabled" : "Off"}</Badge> : null}
       </div>
       <div className="card__body">
-        {!url ? (
-          <p style={{ color: "var(--text-2)", fontSize: 13 }}>Protect this shared login with an authenticator app. The next sign-in asks for a 6-digit code.</p>
-        ) : (
+        {!enabled && !pending ? (
+          <p style={{ color: "var(--text-2)", fontSize: 13 }}>
+            Protect this login with an authenticator app (Google Authenticator, 1Password, Authy). The next sign-in asks for a 6-digit code.
+          </p>
+        ) : null}
+        {enabled && !pending ? (
+          <p style={{ color: "var(--text-2)", fontSize: 13 }}>
+            2FA is on. You&apos;ll be asked for a 6-digit code on every sign-in. To turn it off, enter a current code below.
+          </p>
+        ) : null}
+        {pending ? (
           <>
-            <p style={{ color: "var(--text-2)", fontSize: 13, marginBottom: 8 }}>Scan this URL in your authenticator app (or paste it), then sign out and back in to verify:</p>
+            <p style={{ color: "var(--text-2)", fontSize: 13, marginBottom: 8 }}>
+              1. Open your authenticator app → add account → enter this secret key manually (or paste the URL):
+            </p>
             <div className="link-box">
-              <code title={url}>{url}</code>
+              <code title={pending.secret}>{pending.secret}</code>
             </div>
+            <div className="link-box" style={{ marginTop: 8 }}>
+              <code title={pending.otpauthUrl} style={{ fontSize: 11 }}>{pending.otpauthUrl}</code>
+            </div>
+            <p style={{ color: "var(--text-2)", fontSize: 13, margin: "12px 0 8px" }}>
+              2. Then enter the 6-digit code to confirm — 2FA only turns on after this step.
+            </p>
+            <input
+              className="input"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="123456"
+              style={{ height: 44, letterSpacing: 4, textAlign: "center", fontSize: 18 }}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") confirmSetup();
+              }}
+            />
+            {confirm.isError ? (
+              <p style={{ color: "var(--danger, #e5484d)", fontSize: 13, marginTop: 8 }}>Wrong code — check the app and try again.</p>
+            ) : null}
           </>
-        )}
+        ) : null}
+        {enabled && !pending ? (
+          <input
+            className="input"
+            inputMode="numeric"
+            maxLength={6}
+            placeholder="Current 6-digit code"
+            style={{ height: 44, letterSpacing: 4, textAlign: "center", fontSize: 18, marginTop: 12 }}
+            value={disableCode}
+            onChange={(e) => setDisableCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          />
+        ) : null}
       </div>
-      {!url ? (
-        <div className="card__foot">
-          <Button disabled={setup.isPending} onClick={() => setup.mutate(undefined, { onSuccess: (d) => setUrl(d.otpauthUrl) })}>
+      <div className="card__foot" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {!enabled && !pending ? (
+          <Button disabled={setup.isPending} onClick={startSetup}>
             <Icon name="lock" size={16} />
             {setup.isPending ? "Generating…" : "Enable 2FA"}
           </Button>
-        </div>
-      ) : null}
+        ) : null}
+        {pending ? (
+          <>
+            <Button disabled={confirm.isPending || code.length !== 6} onClick={confirmSetup}>
+              {confirm.isPending ? "Verifying…" : "Confirm & enable"}
+            </Button>
+            <Button variant="subtle" onClick={() => { setPending(null); setCode(""); confirm.reset(); }}>
+              Cancel
+            </Button>
+          </>
+        ) : null}
+        {enabled && !pending ? (
+          <Button variant="subtle" disabled={disable.isPending || disableCode.length !== 6} onClick={disableMfa}>
+            {disable.isPending ? "Disabling…" : "Disable 2FA"}
+          </Button>
+        ) : null}
+      </div>
     </section>
   );
 }

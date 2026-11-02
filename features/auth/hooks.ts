@@ -1,13 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/lib/toast';
 import { setSession, setSessionUser } from '@/lib/auth-session';
 import { ApiError } from '@/lib/api-client';
 import { errorText } from '@/lib/error-map';
-import { adminLogin, setupMfa, verifyMfa, type LoginInput } from './api';
+import { adminLogin, confirmMfa, disableMfa, mfaStatus, setupMfa, verifyMfa, type LoginInput } from './api';
 
 export function useAdminLogin() {
   const router = useRouter();
@@ -48,5 +48,31 @@ export function useSetupMfa() {
   return useMutation({
     mutationFn: setupMfa,
     onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+  });
+}
+
+export function useConfirmMfa() {
+  return useMutation({
+    mutationFn: confirmMfa,
+    onSuccess: () => toast.success('2FA enabled', 'Next sign-in will ask for a code'),
+    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+  });
+}
+
+export function useDisableMfa() {
+  return useMutation({
+    mutationFn: disableMfa,
+    onSuccess: () => toast.success('2FA disabled'),
+    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+  });
+}
+
+export function useMfaStatus(active = true) {
+  // Lazy query — only fetched when the Settings page mounts.
+  return useQuery({
+    queryKey: ['mfa-status'],
+    queryFn: mfaStatus,
+    enabled: active,
+    staleTime: 30_000,
   });
 }

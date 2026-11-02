@@ -22,6 +22,18 @@ export async function verifyMfa(tempToken: string, code: string) {
   });
 }
 
-export async function setupMfa(): Promise<{ otpauthUrl: string }> {
-  return apiPost<{ otpauthUrl: string }>('/auth/admin/mfa/setup');
+export async function setupMfa(): Promise<{ secret: string; otpauthUrl: string }> {
+  return apiPost<{ secret: string; otpauthUrl: string }>('/auth/admin/mfa/setup');
+}
+
+export async function confirmMfa(code: string) {
+  return apiPost<{ enabled: boolean }>('/auth/admin/mfa/confirm', { code });
+}
+
+export async function disableMfa(code: string) {
+  return apiPost<{ enabled: boolean }>('/auth/admin/mfa/disable', { code });
+}
+
+export async function mfaStatus(): Promise<{ enabled: boolean; pending: boolean }> {
+  return apiPost<{ enabled: boolean; pending: boolean }>('/auth/admin/mfa/status', {});
 }
