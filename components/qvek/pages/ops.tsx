@@ -18,6 +18,7 @@ import { Icon } from "../icon";
 // import { OpsAccessCard, OpsTimingsCard, PricingCard, SupportCard, ZonesCard } from "../settings-cards";
 import { PricingCard, SupportCard, ZonesCard } from "../settings-cards";
 import { MiniMap } from "../map-parts";
+import { QRCodeSVG } from "qrcode.react";
 import { useConfirmMfa, useDisableMfa, useMfaStatus, useSetupMfa } from "@/features/auth/hooks";
 import { mockCaptureEnabled } from "@/features/payments/hooks";
 import { useAuditLogs, usePollFleet, useReconcile } from "@/features/fleet/hooks";
@@ -577,13 +578,24 @@ function MfaCard() {
         {pending ? (
           <>
             <p style={{ color: "var(--text-2)", fontSize: 13, marginBottom: 8 }}>
-              1. Open your authenticator app → add account → enter this secret key manually (or paste the URL):
+              1. Open your authenticator app → Add account → <b>Scan QR code</b>. If scan fails, choose “Enter key manually” and type only this secret (no spaces, no URL):
             </p>
-            <div className="link-box">
-              <code title={pending.secret}>{pending.secret}</code>
-            </div>
-            <div className="link-box" style={{ marginTop: 8 }}>
-              <code title={pending.otpauthUrl} style={{ fontSize: 11 }}>{pending.otpauthUrl}</code>
+            <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
+              <div style={{ background: "#fff", padding: 12, borderRadius: 12, lineHeight: 0 }}>
+                <QRCodeSVG value={pending.otpauthUrl.trim()} size={160} />
+              </div>
+              <div style={{ flex: "1 1 200px" }}>
+                <div className="link-box">
+                  <code title={pending.secret}>{pending.secret}</code>
+                </div>
+                <Button
+                  variant="subtle"
+                  style={{ marginTop: 8 }}
+                  onClick={() => navigator.clipboard?.writeText(pending.secret.trim()).catch(() => {})}
+                >
+                  Copy secret key
+                </Button>
+              </div>
             </div>
             <p style={{ color: "var(--text-2)", fontSize: 13, margin: "12px 0 8px" }}>
               2. Then enter the 6-digit code to confirm — 2FA only turns on after this step.
