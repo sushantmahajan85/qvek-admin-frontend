@@ -27,15 +27,11 @@ import { useAutoRefresh } from "../use-auto-refresh";
 
 const ALERT_TONE: Record<string, "red" | "green" | "amber" | "blue" | "violet" | "grey"> = {
   VEHICLE_DISARMED: "red",
-  SOS: "red",
   VEHICLE_REACTIVATED: "green",
   GEOFENCE_WARNING: "amber",
   TAMPER: "amber",
-  OVERSPEED: "amber",
-  LOW_BATTERY: "amber",
   PAYMENT_RECEIVED: "blue",
   RENTAL_EXPIRING: "blue",
-  GRACE_ENDING: "blue",
   RECOVERY: "violet",
   VEHICLE_OFFLINE: "grey",
 };
@@ -486,7 +482,7 @@ export function ControlsPage() {
               }
             />
           ) : !alerts.data?.length ? (
-            <EmptyState icon="bell" title="No alerts" text="Geofence, offline, SOS and immobilize events from the tracker vendor appear here." />
+            <EmptyState icon="bell" title="No alerts" text="Geofence, offline, tamper and immobilize events from the tracker vendor appear here." />
           ) : (
             <div className="tl">
               {alerts.data.slice(0, 30).map((a) => {

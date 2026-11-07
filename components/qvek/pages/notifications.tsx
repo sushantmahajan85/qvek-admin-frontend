@@ -494,19 +494,14 @@ function NotificationRow({ tpl, onEdit }: { tpl: NotificationTemplate; onEdit: (
 
 /* ---------------------------------------------------------------- activity rows */
 const ACTIVITY_TONE: Record<string, string> = {
-  SOS: "tone-red",
-  CRASH: "tone-red",
   TAMPER: "tone-red",
   ACCOUNT_BLOCKED: "tone-red",
   APPLICATION_REJECTED: "tone-red",
   PAYMENT_FAILED: "tone-red",
   VEHICLE_DISARMED: "tone-red",
   GEOFENCE_WARNING: "tone-amber",
-  GRACE_ENDING: "tone-amber",
   RENTAL_EXPIRING: "tone-amber",
   RENTAL_EXPIRED: "tone-amber",
-  OVERSPEED: "tone-amber",
-  LOW_BATTERY: "tone-amber",
   PAYMENT_RECEIVED: "tone-green",
   VEHICLE_REACTIVATED: "tone-green",
   APPLICATION_APPROVED: "tone-green",
@@ -807,8 +802,8 @@ export function NotificationsPage() {
           <Icon name="info" size={16} />
           <p className="cell-sub" style={{ margin: 0 }}>
             Remote notifications are displayed by the operating system while the rider app is foregrounded,
-            backgrounded, or fully closed. Delivery depends on the device allowing notifications. Safety alerts
-            (SOS, crash, tamper) are always on.
+            backgrounded, or fully closed. Delivery depends on the device allowing notifications. Tamper alerts
+            are always on.
           </p>
         </div>
       </section>
