@@ -494,7 +494,6 @@ function NotificationRow({ tpl, onEdit }: { tpl: NotificationTemplate; onEdit: (
 
 /* ---------------------------------------------------------------- activity rows */
 const ACTIVITY_TONE: Record<string, string> = {
-  TAMPER: "tone-red",
   ACCOUNT_BLOCKED: "tone-red",
   APPLICATION_REJECTED: "tone-red",
   PAYMENT_FAILED: "tone-red",
@@ -507,7 +506,6 @@ const ACTIVITY_TONE: Record<string, string> = {
   APPLICATION_APPROVED: "tone-green",
   VEHICLE_ASSIGNED: "tone-green",
   ANNOUNCEMENT: "tone-blue",
-  VEHICLE_OFFLINE: "tone-grey",
 };
 
 function ActivityRow({ a }: { a: AlertItem }) {
@@ -802,8 +800,7 @@ export function NotificationsPage() {
           <Icon name="info" size={16} />
           <p className="cell-sub" style={{ margin: 0 }}>
             Remote notifications are displayed by the operating system while the rider app is foregrounded,
-            backgrounded, or fully closed. Delivery depends on the device allowing notifications. Tamper alerts
-            are always on.
+            backgrounded, or fully closed. Delivery depends on the device allowing notifications.
           </p>
         </div>
       </section>

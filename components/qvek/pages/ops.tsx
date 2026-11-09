@@ -29,11 +29,9 @@ const ALERT_TONE: Record<string, "red" | "green" | "amber" | "blue" | "violet" |
   VEHICLE_DISARMED: "red",
   VEHICLE_REACTIVATED: "green",
   GEOFENCE_WARNING: "amber",
-  TAMPER: "amber",
   PAYMENT_RECEIVED: "blue",
   RENTAL_EXPIRING: "blue",
   RECOVERY: "violet",
-  VEHICLE_OFFLINE: "grey",
 };
 
 /* ---------------------------------------------------------------- Recovery */
@@ -482,7 +480,7 @@ export function ControlsPage() {
               }
             />
           ) : !alerts.data?.length ? (
-            <EmptyState icon="bell" title="No alerts" text="Geofence, offline, tamper and immobilize events from the tracker vendor appear here." />
+            <EmptyState icon="bell" title="No alerts" text="Geofence and immobilize events from the tracker vendor appear here." />
           ) : (
             <div className="tl">
               {alerts.data.slice(0, 30).map((a) => {
