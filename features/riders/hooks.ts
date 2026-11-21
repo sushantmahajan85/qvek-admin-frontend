@@ -5,7 +5,7 @@ import { toast } from '@/lib/toast';
 import { ApiError } from '@/lib/api-client';
 import { errorText } from '@/lib/error-map';
 import type { RiderStatus } from '@/lib/constants';
-import { approveRider, cancelRiderDeletion, createRider, getRider, listRiders, purgeRider, refundRiderDeposit, rejectRider, returnRiderVehicle, riderKeys, transitionRider, updateRider, type ReturnResult, type UpdateRiderInput } from './api';
+import { approveRider, cancelRiderDeletion, changeRiderDepositPlan, createRider, getRider, listRiders, purgeRider, refundRiderDeposit, rejectRider, returnRiderVehicle, riderKeys, transitionRider, updateRider, type ReturnResult, type UpdateRiderInput } from './api';
 
 export function useRiders(q: string) {
   // Poll so an in-app Razorpay deposit appears on the review queue / approve
@@ -25,13 +25,37 @@ function invalidate(qc: ReturnType<typeof useQueryClient>, id: string) {
 export function useApproveRider(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (paidToken: boolean) => approveRider(id, paidToken),
+    mutationFn: (input: { paidToken: boolean; depositPlanId?: string }) =>
+      approveRider(id, input.paidToken, input.depositPlanId),
     onSuccess: () => {
       invalidate(qc, id);
       toast.success('Rider approved — app access unlocked');
     },
     onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
   });
+}
+
+export function useChangeRiderDepositPlan(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { depositPlanId: string; reason?: string }) =>
+      changeRiderDepositPlan(id, input.depositPlanId, input.reason),
+    onSuccess: (res) => {
+      invalidate(qc, id);
+      if (res.additionalCollectionPaise > 0) {
+        toast.success(`Tier changed — collect ${formatMoney(res.additionalCollectionPaise)} extra`);
+      } else if (res.refundDuePaise > 0) {
+        toast.success(`Tier changed — refund ${formatMoney(res.refundDuePaise)}`);
+      } else {
+        toast.success('Deposit tier updated');
+      }
+    },
+    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+  });
+}
+
+function formatMoney(paise: number): string {
+  return `₹${(paise / 100).toLocaleString('en-IN')}`;
 }
 
 export function useTransitionRider(id: string) {

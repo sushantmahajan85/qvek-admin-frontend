@@ -96,6 +96,10 @@ export interface Rider {
   edits?: RiderEdit[];
   /** Deposit + first-week rent collected offline (backend paidToken). */
   paidToken: boolean;
+  /** Selected security-deposit tier; daily rent is locked to it. */
+  depositPlanId?: string | null;
+  depositPaise?: number | null;
+  dailyRentPaise?: number | null;
   /** Account-deletion request timestamp (ms) — null when none. */
   deletionRequestedAt?: number | null;
   /** True once personal data has been anonymised. */

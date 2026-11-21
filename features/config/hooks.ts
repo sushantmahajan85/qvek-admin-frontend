@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/lib/toast';
 import { ApiError } from '@/lib/api-client';
 import { errorText } from '@/lib/error-map';
-import { getOps, getSupport, getUiConfig, getZones, setOps, setPricing, setSupport, setUiSection, setZones, type OpsInput, type PricingInput, type UiSectionName, type ZonesInput } from './api';
+import { getOps, getSupport, getUiConfig, getZones, setDepositPlans, setOps, setPricing, setSupport, setUiSection, setZones, type DepositPlanInput, type OpsInput, type PricingInput, type UiSectionName, type ZonesInput } from './api';
 
 export function useSupport() {
   return useQuery({ queryKey: ['support'], queryFn: getSupport });
@@ -22,8 +22,7 @@ export function useSetSupport() {
   });
 }
 
-export function useZones() {
-  return useQuery({ queryKey: ['zones'], queryFn: getZones });
+export function useZones() {  return useQuery({ queryKey: ['zones'], queryFn: getZones });
 }
 
 export function useSetZones() {
@@ -51,11 +50,21 @@ export function useSetPricing() {
   });
 }
 
-export function useOps() {
-  return useQuery({ queryKey: ['ops'], queryFn: getOps, refetchInterval: 60_000 });
+export function useSetDepositPlans() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (plans: DepositPlanInput[]) => setDepositPlans(plans),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['support'] });
+      toast.success('Deposit tiers updated');
+    },
+    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+  });
 }
 
-export function useSetOps() {
+export function useOps() {
+  return useQuery({ queryKey: ['ops'], queryFn: getOps, refetchInterval: 60_000 });
+}export function useSetOps() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: OpsInput) => setOps(input),

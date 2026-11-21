@@ -21,6 +21,7 @@ import { ASSET_TO_API } from "@/features/live/map-state";
 import { simVehicleStatus } from "@/features/live/sim-actions";
 import { riderKeys } from "@/features/riders/api";
 import { useApproveRider, useCreateRider, useRejectRider, useTransitionRider, useUpdateRider } from "@/features/riders/hooks";
+import { useSupport } from "@/features/config/hooks";
 import { STATUS_DESC, FIN_STATUS } from "@/lib/qvek/selectors";
 import { D, G, L, store } from "@/lib/qvek/store";
 import type { AssetStatus, KycKey, Rider, Vehicle } from "@/lib/qvek/types";
@@ -131,14 +132,18 @@ export function ControlFlow({ id, op }: { id: string; op: "immobilize" | "reacti
 export function ApproveFlow({ id }: { id: string }) {
   const r = G.rider(id)!;
   const approve = useApproveRider(id);
+  const support = useSupport();
+  const plans = (support.data?.depositPlans ?? []).filter((p) => p.enabled);
   const k = D.kycSummary(r);
   const [paid, setPaid] = useState(false);
+  const [tier, setTier] = useState<string>("");
+  const selectedTier = plans.find((p) => p.id === tier) ?? plans[0];
   // The rider may already have paid the deposit in-app (Razorpay webhook sets
   // paidToken + a VERIFIED DEPOSIT row). Then the admin must not mark it again —
   // approve is allowed as-is and the server won't create a second deposit row.
   const depositOnFile = r.deposit.status === "received";
-  const depositAmount = r.deposit.amount || store.state.config.deposit;
-  const canApprove = depositOnFile || paid;
+  const depositAmount = r.deposit.amount || (selectedTier ? Math.round(selectedTier.depositPaise / 100) : 0) || store.state.config.deposit;
+  const canApprove = depositOnFile || (paid && !!selectedTier);
   return (
     <Modal
       title={"Approve " + r.name + "?"}
@@ -156,7 +161,10 @@ export function ApproveFlow({ id }: { id: string }) {
           onClick: async () => {
             try {
               // markOffline=false when the deposit is already on file (in-app payment).
-              await approve.mutateAsync(!depositOnFile);
+              await approve.mutateAsync({
+                paidToken: !depositOnFile,
+                ...(!depositOnFile && selectedTier ? { depositPlanId: selectedTier.id } : {}),
+              });
             } catch {
               return false;
             }
@@ -189,7 +197,17 @@ export function ApproveFlow({ id }: { id: string }) {
         <>
           <div className="notice notice--warn" style={{ marginTop: 12 }}>
             <Icon name="alert" size={16} />
-            <span>Approval confirms the {U.money(store.state.config.deposit)} security deposit.</span>
+            <span>Approval confirms the {U.money(depositAmount)} security deposit and locks the daily rent for this rider.</span>
+          </div>
+          <div className="field" style={{ marginTop: 12 }}>
+            <label htmlFor="ap-tier">Security-deposit plan</label>
+            <select id="ap-tier" className="input" value={selectedTier?.id ?? ""} onChange={(e) => setTier(e.target.value)}>
+              {plans.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label} · {U.money(Math.round(p.dailyRentPaise / 100))}/day
+                </option>
+              ))}
+            </select>
           </div>
           <label className="check" style={{ marginTop: 12 }}>
             <input type="checkbox" id="ap-paid" checked={paid} onChange={(e) => setPaid(e.target.checked)} /> Deposit collected offline

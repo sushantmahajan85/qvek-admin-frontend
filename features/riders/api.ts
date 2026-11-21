@@ -10,6 +10,10 @@ export interface Rider {
   platform?: string | null;
   status: RiderStatus;
   paidToken: boolean;
+  depositPlanId?: string | null;
+  depositPaise?: number | null;
+  dailyRentPaise?: number | null;
+  depositPlanSetAt?: string | null;
   createdAt: string;
   /** Account-deletion request (Play policy); purgedAt set once anonymised. */
   deletionRequestedAt?: string | null;
@@ -39,8 +43,29 @@ export async function getRider(id: string): Promise<RiderDetail> {
   return apiGet<RiderDetail>(`/admin/riders/${id}`);
 }
 
-export async function approveRider(id: string, paidToken: boolean): Promise<Rider> {
-  return apiPost<Rider>(`/admin/riders/${id}/approve`, { paidToken });
+export async function approveRider(id: string, paidToken: boolean, depositPlanId?: string): Promise<Rider> {
+  return apiPost<Rider>(`/admin/riders/${id}/approve`, {
+    paidToken,
+    ...(depositPlanId ? { depositPlanId } : {}),
+  });
+}
+
+export interface DepositPlanChangeResult extends Rider {
+  collectedPaise: number | null;
+  differencePaise: number;
+  additionalCollectionPaise: number;
+  refundDuePaise: number;
+}
+
+export async function changeRiderDepositPlan(
+  id: string,
+  depositPlanId: string,
+  reason?: string,
+): Promise<DepositPlanChangeResult> {
+  return apiPost<DepositPlanChangeResult>(`/admin/riders/${id}/deposit-plan`, {
+    depositPlanId,
+    ...(reason ? { reason } : {}),
+  });
 }
 
 export interface CreateRiderInput {

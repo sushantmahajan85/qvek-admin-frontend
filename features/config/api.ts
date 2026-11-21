@@ -1,5 +1,14 @@
 import { apiGet, apiPut } from '@/lib/api-client';
 
+export interface DepositPlanOption {
+  id: string;
+  label: string;
+  depositPaise: number;
+  dailyRentPaise: number;
+  weeklyRentPaise: number;
+  enabled: boolean;
+}
+
 export interface SupportConfig {
   callNumber: string | null;
   whatsappNumber: string | null;
@@ -8,6 +17,7 @@ export interface SupportConfig {
   weeklyRentPaise: number;
   plans: Record<string, number>;
   depositPaise: number;
+  depositPlans: DepositPlanOption[];
 }
 
 export async function getSupport(): Promise<SupportConfig> {
@@ -57,6 +67,18 @@ export interface PricingInput {
 
 export async function setPricing(input: PricingInput): Promise<SupportConfig> {
   return apiPut<SupportConfig>('/config/pricing', input);
+}
+
+export interface DepositPlanInput {
+  id: string;
+  label: string;
+  depositPaise: number;
+  dailyRentPaise: number;
+  enabled?: boolean;
+}
+
+export async function setDepositPlans(plans: DepositPlanInput[]): Promise<SupportConfig> {
+  return apiPut<SupportConfig>('/config/deposit-plans', { plans });
 }
 
 export interface OpsConfig {

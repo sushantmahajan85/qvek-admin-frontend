@@ -1,10 +1,11 @@
 "use client";
 
 /* Bodies of the vehicle-record and rider slide-over drawers (ported from vehicleDrawerHTML / riderDrawerHTML). */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { useCancelRiderDeletion, usePurgeRider, useRefundDeposit, useReturnRider } from "@/features/riders/hooks";
+import { useCancelRiderDeletion, useChangeRiderDepositPlan, usePurgeRider, useRefundDeposit, useReturnRider } from "@/features/riders/hooks";
+import { useSupport } from "@/features/config/hooks";
 import { Button } from "@/components/ui/button";
 import { formatPaise } from "@/features/config/api";
 import { requestKyc } from "@/features/live/requests";
@@ -351,7 +352,15 @@ export function RiderDrawerBody({ r, fin, onFin }: { r: Rider; fin: string; onFi
   const cancelDeletion = useCancelRiderDeletion(r.id);
   const refund = useRefundDeposit(r.id);
   const doReturn = useReturnRider(r.id);
+  const support = useSupport();
+  const depositPlans = (support.data?.depositPlans ?? []).filter((p) => p.enabled);
+  const changePlan = useChangeRiderDepositPlan(r.id);
+  const [tier, setTier] = useState(r.depositPlanId ?? "");
   const ui = useUI();
+
+  useEffect(() => {
+    if (r.depositPlanId) setTier(r.depositPlanId);
+  }, [r.id, r.depositPlanId]);
 
   const confirmReturn = () => {
     void (async () => {
@@ -629,6 +638,43 @@ export function RiderDrawerBody({ r, fin, onFin }: { r: Rider; fin: string; onFi
             Required amount: <b>{U.money(s.config.deposit)}</b>, collected offline or User can Pay online. It is recorded when the application is approved.
           </p>
         )}
+      </div>
+
+      <div className="dsec">
+        <h3>
+          Deposit plan <Badge tone="amber">Admin only</Badge>
+        </h3>
+        <dl className="kv">
+          <dt>Current tier</dt>
+          <dd>{r.depositPlanId || "Not set"}</dd>
+          <dt>Daily rent</dt>
+          <dd>{r.dailyRentPaise != null ? U.money(Math.round(r.dailyRentPaise / 100)) + "/day" : "Legacy global rate"}</dd>
+        </dl>
+        <div className="field" style={{ marginTop: 12 }}>
+          <label htmlFor="rider-tier">Change tier</label>
+          <select id="rider-tier" className="input" value={tier} onChange={(e) => setTier(e.target.value)}>
+            <option value="">Select a plan…</option>
+            {depositPlans.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label} · {U.money(Math.round(p.dailyRentPaise / 100))}/day
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="actions-row" style={{ marginTop: 10 }}>
+          <Button
+            size="sm"
+            disabled={!tier || tier === r.depositPlanId || changePlan.isPending}
+            onClick={() => changePlan.mutate({ depositPlanId: tier, reason: "admin changed deposit tier" })}
+          >
+            <Icon name="shield" size={15} />
+            {changePlan.isPending ? "Updating…" : "Update deposit tier"}
+          </Button>
+        </div>
+        <p className="field__hint" style={{ marginTop: 8 }}>
+          The rider cannot change this. The daily rent locks to the new tier immediately. If the deposit
+          amount differs, collect or refund the difference separately — this control does not move money.
+        </p>
       </div>
 
       {r.application.status === "approved" ? (

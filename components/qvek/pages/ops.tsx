@@ -16,7 +16,7 @@ import { Icon } from "../icon";
 // Ops timings + signup/upload notices cards are disabled per operations request.
 // Components stay in settings-cards.tsx so they can be re-enabled by uncommenting.
 // import { OpsAccessCard, OpsTimingsCard, PricingCard, SupportCard, ZonesCard } from "../settings-cards";
-import { PricingCard, SupportCard, ZonesCard } from "../settings-cards";
+import { DepositTiersCard, SupportCard, ZonesCard } from "../settings-cards";
 import { MiniMap } from "../map-parts";
 import { QRCodeSVG } from "qrcode.react";
 import { useConfirmMfa, useDisableMfa, useMfaStatus, useSetupMfa } from "@/features/auth/hooks";
@@ -688,7 +688,7 @@ export function SettingsPage() {
       <div className="grid-2-eq">
         <div className="stack">
           <SupportCard key={supportKey} />
-          <PricingCard />
+          <DepositTiersCard />
           <ZonesCard />
           {/* Hidden for now — operational timings (grace/warn/offline/SIM).
           <OpsTimingsCard /> */}

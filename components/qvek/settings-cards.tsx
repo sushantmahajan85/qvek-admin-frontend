@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useOps, useSetOps, useSetPricing, useSetSupport, useSetZones, useZones } from "@/features/config/hooks";
+import { useOps, useSetDepositPlans, useSetOps, useSetPricing, useSetSupport, useSetZones, useZones } from "@/features/config/hooks";
 import { useSupport } from "@/features/config/hooks";
 import { store } from "@/lib/qvek/store";
 import { FieldError } from "./bits";
@@ -446,6 +446,99 @@ export function OpsAccessCard() {
         <Button variant="primary" disabled={save.isPending || ops.isLoading} onClick={submit}>
           <Icon name="check" size={16} />
           {save.isPending ? "Saving…" : "Save settings"}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+
+/* Deposit tiers: each row pairs a refundable deposit with the rider's locked
+ * daily rent. Existing riders keep their old lock; new deposits use these. */
+type TierRow = { id: string; label: string; deposit: string; daily: string; enabled: boolean };
+
+export function DepositTiersCard() {
+  const support = useSupport();
+  const save = useSetDepositPlans();
+  const [rows, setRows] = useState<TierRow[]>([]);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!support.data) return;
+    setRows(
+      support.data.depositPlans.map((p) => ({
+        id: p.id,
+        label: p.label,
+        deposit: String(Math.round(p.depositPaise / 100)),
+        daily: String(Math.round(p.dailyRentPaise / 100)),
+        enabled: p.enabled,
+      })),
+    );
+  }, [support.data]);
+
+  const setRow = (i: number, patch: Partial<TierRow>) =>
+    setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+
+  const submit = () => {
+    const plans = rows.map((r) => ({
+      id: r.id,
+      label: r.label.trim(),
+      depositPaise: Math.round(Number(r.deposit) * 100),
+      dailyRentPaise: Math.round(Number(r.daily) * 100),
+      enabled: r.enabled,
+    }));
+    if (!plans.length) return setErr("Add at least one deposit tier.");
+    if (plans.some((p) => !p.id || !p.label || !Number.isInteger(p.depositPaise) || p.depositPaise < 0 || !Number.isInteger(p.dailyRentPaise) || p.dailyRentPaise < 0)) {
+      return setErr("Every tier needs an ID, label, deposit and daily rent.");
+    }
+    setErr(null);
+    save.mutate(plans);
+  };
+
+  return (
+    <section className="card">
+      <div className="card__head">
+        <h2>
+          <Icon name="shield" size={16} />
+          Deposit tiers &amp; daily rent
+        </h2>
+        {support.isError ? <Badge tone="amber">Unavailable</Badge> : <Badge tone="blue">Locked per rider</Badge>}
+      </div>
+      <form className="card__body" noValidate onSubmit={(e) => { e.preventDefault(); submit(); }}>
+        <div className="stack">
+          {rows.map((row, i) => (
+            <div key={i} className="form-grid">
+              <div className="field">
+                <label>Deposit (₹)</label>
+                <input className="input" type="number" min={0} step={1} value={row.deposit} onChange={(e) => setRow(i, { deposit: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>Daily rent (₹)</label>
+                <input className="input" type="number" min={0} step={1} value={row.daily} onChange={(e) => setRow(i, { daily: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>Label</label>
+                <input className="input" value={row.label} onChange={(e) => setRow(i, { label: e.target.value })} />
+              </div>
+              <div className="field">
+                <label className="check">
+                  <input type="checkbox" checked={row.enabled} onChange={(e) => setRow(i, { enabled: e.target.checked })} /> Enabled
+                </label>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="field__hint" style={{ marginTop: 12 }}>
+          Riders choose one tier before paying the deposit. Their daily rent locks to it; only an admin
+          can change it later. Editing a tier does not change riders already locked to it.
+        </p>
+        {err ? <FieldError>{err}</FieldError> : null}
+        {support.isError ? <FieldError>Could not load deposit tiers.</FieldError> : null}
+      </form>
+      <div className="card__foot">
+        <Button variant="primary" disabled={save.isPending || support.isLoading} onClick={submit}>
+          <Icon name="check" size={16} />
+          {save.isPending ? "Saving…" : "Save deposit tiers"}
         </Button>
       </div>
     </section>
