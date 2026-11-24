@@ -523,6 +523,8 @@ export function ComponentsFlow({ id }: { id: string }) {
           <input
             className="input"
             id="cm-iop"
+            inputMode="numeric"
+            placeholder="e.g. 868720065959201"
             maxLength={IOP_ID_MAX}
             value={iopId}
             onChange={(e) => setIopId(sanitizeIopIdInput(e.target.value))}
@@ -678,6 +680,8 @@ export function AddVehicleFlow() {
             <input
               className="input"
               id="av-iop"
+              inputMode="numeric"
+              placeholder="e.g. 868720065959201"
               autoComplete="off"
               maxLength={IOP_ID_MAX}
               value={iopId}
@@ -878,7 +882,7 @@ export function BulkAddVehiclesFlow() {
                 </thead>
                 <tbody>
                   <tr><td className="cell-mono">Vehicle No.</td><td>Yes</td><td className="cell-mono">QVEK-001</td></tr>
-                  <tr><td className="cell-mono">IOP ID</td><td>Yes</td><td className="cell-mono">IOP-10001</td></tr>
+                  <tr><td className="cell-mono">IOP ID</td><td>Yes</td><td className="cell-mono">868720065959201</td></tr>
                   <tr><td className="cell-mono">Chassis No.</td><td className="cell-sub">Optional</td><td className="cell-mono">CH-10001</td></tr>
                   <tr><td className="cell-mono">Motor No.</td><td className="cell-sub">Optional</td><td className="cell-mono">MT-10001</td></tr>
                   <tr><td className="cell-mono">Controller No.</td><td className="cell-sub">Optional</td><td className="cell-mono">CT-10001</td></tr>

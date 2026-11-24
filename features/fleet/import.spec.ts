@@ -3,6 +3,11 @@ import { describe, expect, it } from 'vitest';
 import writeXlsxFile from 'write-excel-file/node';
 import { buildTemplateSheets, IMPORT_LIMIT, parseCsv, parseVehiclesFile } from './import';
 
+const I1 = '868720065959201';
+const I2 = '868720065959202';
+const I3 = '356218606624383';
+const imei = (n: number) => String(868720065950000 + n).padStart(15, '0');
+
 function csvFile(lines: string[]): File {
   return new File([lines.join('\n')], 'vehicles.csv', { type: 'text/csv' });
 }
@@ -22,17 +27,17 @@ describe('parseVehiclesFile', () => {
     const parsed = await parseVehiclesFile(
       csvFile([
         'Vehicle Number,IOT ID,Chassis Number,Motor No.,Controller No.',
-        'QVEK-001,IOP-10001,CH-1,MT-1,CT-1',
-        'QVEK-002,IOP-10002,,,',
-        'QVEK-003,IOP-10003,CH-10003,MT-10003,CT-10003',
+        `QVEK-001,${I1},CH-1,MT-1,CT-1`,
+        `QVEK-002,${I2},,,`,
+        `QVEK-003,${I3},CH-10003,MT-10003,CT-10003`,
       ]),
     );
     expect(parsed.total).toBe(3);
     expect(parsed.issues).toHaveLength(1);
     expect(parsed.issues[0]?.row).toBe(3);
     expect(parsed.rows).toEqual([
-      { vehicleNo: 'QVEK-001', iopId: 'IOP-10001', chassisNo: 'CH-1', motorNo: 'MT-1', controllerNo: 'CT-1', row: 2 },
-      { vehicleNo: 'QVEK-003', iopId: 'IOP-10003', chassisNo: 'CH-10003', motorNo: 'MT-10003', controllerNo: 'CT-10003', row: 4 },
+      { vehicleNo: 'QVEK-001', iopId: I1, chassisNo: 'CH-1', motorNo: 'MT-1', controllerNo: 'CT-1', row: 2 },
+      { vehicleNo: 'QVEK-003', iopId: I3, chassisNo: 'CH-10003', motorNo: 'MT-10003', controllerNo: 'CT-10003', row: 4 },
     ]);
   });
 
@@ -43,7 +48,7 @@ describe('parseVehiclesFile', () => {
         'Generated 2026-10-31',
         '',
         'Vehicle No.,IOP ID,Chassis No.,Motor No.,Controller No.',
-        'QVEK-1,IOP-1,CH-1,MT-1,CT-1',
+        `QVEK-1,${I1},CH-1,MT-1,CT-1`,
       ]),
     );
     expect(parsed.rows).toHaveLength(1);
@@ -52,7 +57,7 @@ describe('parseVehiclesFile', () => {
 
   it('reports invalid cells with the sheet row number', async () => {
     const parsed = await parseVehiclesFile(
-      csvFile(['Vehicle No.,IOP ID', ',IOP-1', 'Q,IOP-2']),
+      csvFile(['Vehicle No.,IOP ID', `,${I1}`, 'Q,IOP-2']),
     );
     expect(parsed.rows).toHaveLength(0);
     expect(parsed.issues).toHaveLength(2);
@@ -66,9 +71,9 @@ describe('parseVehiclesFile', () => {
     const parsed = await parseVehiclesFile(
       csvFile([
         'Vehicle No.,IOP ID,Chassis No.,Motor No.,Controller No.',
-        'QVEK-1,IOP-1,CH-1,MT-1,CT-1',
-        'QVEK-2,IOP-1,CH-2,MT-2,CT-2',
-        'QVEK-1,IOP-3,CH-3,MT-3,CT-3',
+        `QVEK-1,${I1},CH-1,MT-1,CT-1`,
+        `QVEK-2,${I1},CH-2,MT-2,CT-2`,
+        `QVEK-1,${I3},CH-3,MT-3,CT-3`,
       ]),
     );
     expect(parsed.rows).toHaveLength(1);
@@ -80,7 +85,7 @@ describe('parseVehiclesFile', () => {
   it('refuses a sheet above the import limit', async () => {
     const lines = ['Vehicle No.,IOP ID,Chassis No.,Motor No.,Controller No.'];
     for (let i = 0; i < IMPORT_LIMIT + 1; i += 1) {
-      lines.push(`QVEK-${i},IOP-${i},CH-${i},MT-${i},CT-${i}`);
+      lines.push(`QVEK-${i},${imei(i)},CH-${i},MT-${i},CT-${i}`);
     }
     await expect(parseVehiclesFile(csvFile(lines))).rejects.toThrow(/limit is 500/);
   });
@@ -105,7 +110,6 @@ describe('downloadable template', () => {
     const parsed = await readSheet(buffer);
     expect(parsed[0].map((c) => String(c))).toEqual(headers);
 
-    // The generated file is accepted by the importer (header found, no rows yet).
     const file = new File([buffer as unknown as BlobPart], 'qvek-vehicles-template.xlsx');
     const result = await parseVehiclesFile(file);
     expect(result.total).toBe(0);

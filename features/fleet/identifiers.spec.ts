@@ -21,6 +21,8 @@ describe('vehicle identifiers', () => {
   it('accepts fleet ids', () => {
     expect(isVehicleIdentifier('QVEK-003')).toBe(true);
     expect(isIopId('868720065959201')).toBe(true);
-    expect(isIopId('IOP-10001')).toBe(true);
+    expect(isIopId('356218606624383')).toBe(true);
+    expect(isIopId('IOP-10001')).toBe(false);
+    expect(isIopId('86872006595920')).toBe(false);
   });
 });
