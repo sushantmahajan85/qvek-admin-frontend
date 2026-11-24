@@ -38,6 +38,7 @@ import {
   formErrorsFromApiValidation,
 } from "@/features/fleet/validation-errors";
 import { AUDIT_REASON_MAX, auditReasonError } from "@/lib/audit-reason";
+import { FULL_NAME_MAX, fullNameError } from "@/lib/full-name";
 import { ApiError } from "@/lib/api-client";
 import { useUpsertKyc } from "@/features/kyc/hooks";
 import { useVerifyPayment } from "@/features/payments/hooks";
@@ -1035,7 +1036,8 @@ export function EditRiderFlow({ id }: { id: string }) {
             const isOther = platform === "Other";
             const pf = isOther ? other.trim() : platform;
             const e: Record<string, string> = {};
-            if (nm.length < 3 || !/^[A-Za-z][A-Za-z .'-]+$/.test(nm)) e.name = "Enter the full name (letters only, at least 3 characters).";
+            const nameErr = fullNameError(nm);
+            if (nameErr) e.name = nameErr;
             if (!normalizedPhone?.startsWith("+91")) e.phone = SUPPORT_PHONE_ERROR;
             if (!ag || ag < 16 || ag > 100) e.age = "Age must be between 16 and 100.";
             if (!pf) e[isOther ? "other" : "platform"] = "Enter the platform name.";
@@ -1068,7 +1070,7 @@ export function EditRiderFlow({ id }: { id: string }) {
             <label htmlFor="er-name">
               Full name <span className="req">*</span>
             </label>
-            <input className="input" id="er-name" autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} />
+            <input className="input" id="er-name" autoComplete="off" maxLength={FULL_NAME_MAX} value={name} onChange={(e) => setName(e.target.value)} />
             {err("name")}
           </div>
           <div className={fieldCls("phone")}>
@@ -1235,12 +1237,13 @@ export function AddRiderFlow({ onAdded }: { onAdded: (riderId: string) => void }
           icon: "userPlus",
           busy: create.isPending ? "Adding…" : undefined,
           onClick: async () => {
-            const nm = name.trim();
+            const nm = name.trim().replace(/\s+/g, " ");
             const normalizedPhone = toSupportPhoneE164(phone);
             const ag = age.trim() ? Number(age.trim()) : undefined;
             const pf = platform.trim();
             const e: Record<string, string> = {};
-            if (nm.length < 2) e.name = "Enter the full name.";
+            const nameErr = fullNameError(nm);
+            if (nameErr) e.name = nameErr;
             if (!normalizedPhone?.startsWith("+91")) e.phone = SUPPORT_PHONE_ERROR;
             else if (G.riderByPhone(normalizedPhone)) e.phone = "This number is already registered.";
             if (ag !== undefined && (!ag || ag < 16 || ag > 100)) e.age = "Age must be between 16 and 100.";
@@ -1269,7 +1272,7 @@ export function AddRiderFlow({ onAdded }: { onAdded: (riderId: string) => void }
             <label htmlFor="ar-name">
               Full name <span className="req">*</span>
             </label>
-            <input className="input" id="ar-name" autoComplete="off" placeholder="As on Aadhaar" value={name} onChange={(e) => setName(e.target.value)} />
+            <input className="input" id="ar-name" autoComplete="off" placeholder="As on Aadhaar" maxLength={FULL_NAME_MAX} value={name} onChange={(e) => setName(e.target.value)} />
             {err("name")}
           </div>
           <div className={fieldCls("phone")}>
