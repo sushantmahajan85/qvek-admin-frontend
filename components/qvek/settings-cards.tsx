@@ -9,6 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useOps, useSetDepositPlans, useSetOps, useSetPricing, useSetSupport, useSetZones, useZones } from "@/features/config/hooks";
 import { useSupport } from "@/features/config/hooks";
+import type { Country, Value } from "react-phone-number-input";
+import { formatPhoneNumberIntl, isValidPhoneNumber } from "react-phone-number-input";
+
+import { AdminPhoneInput } from "@/components/ui/phone-input";
+import { supportPhoneLiveError, toSupportPhoneE164 } from "@/lib/phone";
 import { store } from "@/lib/qvek/store";
 import { FieldError } from "./bits";
 import { Icon } from "./icon";
@@ -44,8 +49,8 @@ export function PricingCard() {
         return;
       }
     }
-    if (touched.daily && (d === undefined || d < 100)) {
-      setErr("Daily price must be at least ₹1.");
+    if (touched.daily && (d === undefined || d <= 0)) {
+      setErr("Daily price must be greater than 0");
       return;
     }
     if (!touched.daily && !touched.deposit) {
@@ -80,7 +85,7 @@ export function PricingCard() {
               <input
                 id="pl-daily"
                 type="number"
-                min={0}
+                min={1}
                 step={1}
                 placeholder={c.plans[0] ? String(Math.round(c.plans[0].price / 7)) : ""}
                 value={daily}
@@ -147,17 +152,26 @@ export function PricingCard() {
 export function SupportCard() {
   const c = store.state.config;
   const save = useSetSupport();
-  const [call, setCall] = useState(c.support.call);
-  const [err, setErr] = useState(false);
+  const [call, setCall] = useState<Value | undefined>(c.support.call || undefined);
+  const [country, setCountry] = useState<Country>("IN");
+  const [submitErr, setSubmitErr] = useState<string | null>(null);
+  const liveErr = supportPhoneLiveError(call, country);
+  const showErr = submitErr ?? liveErr;
+
+  const whatsappPreview =
+    call && isValidPhoneNumber(call)
+      ? formatPhoneNumberIntl(call)
+      : call?.trim() || c.support.whatsapp || "Not configured";
 
   const submit = () => {
-    const v = call.trim();
-    if (v.length < 10 || v.length > 16) {
-      setErr(true);
+    const normalized = toSupportPhoneE164(call);
+    const blocked = liveErr ?? (normalized ? null : supportPhoneLiveError(call, country) ?? "Invalid phone");
+    if (!normalized) {
+      setSubmitErr(blocked);
       return;
     }
-    setErr(false);
-    save.mutate(v);
+    setSubmitErr(null);
+    save.mutate(normalized);
   };
 
   return (
@@ -170,20 +184,38 @@ export function SupportCard() {
       </div>
       <form className="card__body" id="support-form" noValidate onSubmit={(e) => { e.preventDefault(); submit(); }}>
         <div className="form-grid">
-          <div className="field">
+          <div className={showErr ? "field has-error" : "field"}>
             <label htmlFor="sp-call">Call number</label>
-            <input className="input" id="sp-call" inputMode="tel" maxLength={16} placeholder="+91XXXXXXXXXX" value={call} onChange={(e) => setCall(e.target.value)} />
+            <AdminPhoneInput
+              id="sp-call"
+              value={call}
+              onChange={(v) => {
+                setCall(v);
+                setSubmitErr(null);
+              }}
+              onCountryChange={(next) => {
+                if (next) setCountry(next);
+                setSubmitErr(null);
+              }}
+              hasError={!!showErr}
+              disabled={save.isPending}
+              placeholder="+91 XXXXX XXXXX"
+            />
           </div>
           <div className="field">
             <label htmlFor="sp-wa">WhatsApp number</label>
-            <input className="input" id="sp-wa" value={c.support.whatsapp || "Not configured"} readOnly />
+            <input className="input" id="sp-wa" value={whatsappPreview} readOnly />
           </div>
         </div>
         <p className="field__hint" style={{ marginTop: 10 }}>Shown on the rider app&apos;s Contact Admin buttons. Weekly rent is set on the server.</p>
-        {err ? <FieldError>Enter a number with 10–16 characters (e.g. +91XXXXXXXXXX).</FieldError> : null}
+        {showErr ? <FieldError>{showErr}</FieldError> : null}
       </form>
       <div className="card__foot">
-        <Button variant="primary" disabled={save.isPending} onClick={submit}>
+        <Button
+          variant="primary"
+          disabled={save.isPending || !call || !isValidPhoneNumber(call)}
+          onClick={submit}
+        >
           <Icon name="check" size={16} />
           {save.isPending ? "Saving…" : "Save contact"}
         </Button>
@@ -491,6 +523,9 @@ export function DepositTiersCard() {
     if (plans.some((p) => !p.id || !p.label || !Number.isInteger(p.depositPaise) || p.depositPaise < 0 || !Number.isInteger(p.dailyRentPaise) || p.dailyRentPaise < 0)) {
       return setErr("Every tier needs an ID, label, deposit and daily rent.");
     }
+    if (plans.some((p) => p.dailyRentPaise <= 0)) {
+      return setErr("Daily price must be greater than 0");
+    }
     setErr(null);
     save.mutate(plans);
   };
@@ -514,7 +549,7 @@ export function DepositTiersCard() {
               </div>
               <div className="field">
                 <label>Daily rent (₹)</label>
-                <input className="input" type="number" min={0} step={1} value={row.daily} onChange={(e) => setRow(i, { daily: e.target.value })} />
+                <input className="input" type="number" min={1} step={1} value={row.daily} onChange={(e) => setRow(i, { daily: e.target.value })} />
               </div>
               <div className="field">
                 <label>Label</label>

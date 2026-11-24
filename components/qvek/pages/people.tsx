@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { usePageState } from "@/lib/qvek/page-state";
 import { STATUS_DESC, appStage, counts, matchRider } from "@/lib/qvek/selectors";
 import { D, G, store } from "@/lib/qvek/store";
+import { riderCustomerIdLabel, riderDisplayName } from "@/lib/rider-display";
 import { U } from "@/lib/qvek/utils";
 import { useStore } from "@/lib/qvek/use-store";
 import { useAdmin } from "../admin-context";
@@ -115,16 +116,18 @@ export function OnboardingPage() {
                       approved: <Badge tone="green">Approved</Badge>,
                       rejected: <Badge tone="red">Rejected</Badge>,
                     }[st];
+                    const displayName = riderDisplayName(r);
                     return (
                       <tr key={r.id} className="row-main" onClick={() => admin.openRider(r.id)}>
                         <td data-label="Applicant" className="cell-full">
                           <div className="row">
-                            <Avatar name={r.name} />
+                            <Avatar name={displayName} />
                             <div>
-                              <span className="cell-main">{r.name}</span>
+                              <span className="cell-main">{displayName}</span>
                               <span className="cell-sub">
                                 {U.phone(r.phone)}
-                                {r.customerId ? " · " + r.customerId : ""}
+                                {" · "}
+                                <span className="cell-mono">{riderCustomerIdLabel(r.customerId)}</span>
                               </span>
                             </div>
                           </div>
@@ -292,13 +295,14 @@ export function RidersPage() {
                   <tbody>
                     {pageList.map((r) => {
                       const v = G.riderVehicle(r);
+                      const displayName = riderDisplayName(r);
                       return (
                         <tr key={r.id} className="row-main" onClick={() => admin.openRider(r.id)}>
                           <td data-label="Rider" className="cell-full">
                             <div className="row">
-                              <Avatar name={r.name} />
+                              <Avatar name={displayName} />
                               <div>
-                                <span className="cell-main">{r.name}</span>
+                                <span className="cell-main">{displayName}</span>
                                 <span className="cell-sub">
                                   {U.phone(r.phone)} · {r.platform}
                                 </span>
@@ -306,7 +310,7 @@ export function RidersPage() {
                             </div>
                           </td>
                           <td data-label="Customer ID">
-                            <span className="cell-mono">{r.customerId}</span>
+                            <span className="cell-mono">{riderCustomerIdLabel(r.customerId)}</span>
                           </td>
                           <td data-label="Status">
                             <div className="badge-row">

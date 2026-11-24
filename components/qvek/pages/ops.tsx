@@ -713,7 +713,7 @@ export function SettingsPage() {
               </dl>
             </div>
             <div className="card__foot">
-              <Button onClick={() => admin.logout()}>
+              <Button variant="danger" onClick={() => admin.logout()}>
                 <Icon name="logout" size={16} />
                 Log out
               </Button>

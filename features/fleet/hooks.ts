@@ -59,7 +59,10 @@ export function useCreateVehicle() {
       qc.invalidateQueries({ queryKey: ['fleet'] });
       toast.success('Vehicle added');
     },
-    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+    onError: (e) => {
+      if (e instanceof ApiError && e.code === 'VALIDATION_ERROR') return;
+      toast.error(errorText(e instanceof ApiError ? e.code : undefined, e instanceof ApiError ? e.message : undefined));
+    },
   });
 }
 
@@ -103,7 +106,10 @@ export function useUpdateRecord(vehicleId: string) {
       qc.invalidateQueries({ queryKey: ['vehicles'] });
       toast.success('Vehicle record updated');
     },
-    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+    onError: (e) => {
+      if (e instanceof ApiError && e.code === 'VALIDATION_ERROR') return;
+      toast.error(errorText(e instanceof ApiError ? e.code : undefined, e instanceof ApiError ? e.message : undefined));
+    },
   });
 }
 

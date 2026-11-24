@@ -2,6 +2,18 @@ import { z } from 'zod';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api-client';
 import type { RiderStatus, VehicleStatus } from '@/lib/constants';
 
+import {
+  CHASSIS_NO_ERROR,
+  COMPONENT_ID_MAX,
+  isIopId,
+  isVehicleIdentifier,
+  IOP_ID_ERROR,
+  IOP_ID_MAX,
+  MOTOR_NO_ERROR,
+  VEHICLE_NO_ERROR,
+  VEHICLE_NO_MAX,
+} from './identifiers';
+
 export interface FleetRecovery {
   mapsUrl: string | null;
   lat: number | null;
@@ -54,13 +66,35 @@ export interface Vehicle {
   controllerNo?: string | null;
 }
 
+const vehicleId = (min: number, max: number, message: string) =>
+  z
+    .string()
+    .trim()
+    .min(min)
+    .max(max)
+    .refine((v) => isVehicleIdentifier(v, min, max), { message });
+
+const optionalVehicleId = (min: number, message: string) =>
+  z
+    .string()
+    .trim()
+    .max(COMPONENT_ID_MAX)
+    .optional()
+    .transform((v) => (v && v.length >= min ? v : undefined))
+    .refine((v) => v === undefined || isVehicleIdentifier(v, min, COMPONENT_ID_MAX), { message });
+
 export const vehicleSchema = z.object({
-  vehicleNo: z.string().min(2).max(32),
-  iopId: z.string().min(1).max(64),
+  vehicleNo: vehicleId(2, VEHICLE_NO_MAX, VEHICLE_NO_ERROR),
+  iopId: z
+    .string()
+    .trim()
+    .min(1)
+    .max(IOP_ID_MAX)
+    .refine(isIopId, { message: IOP_ID_ERROR }),
   type: z.string().min(1).max(32).optional(),
-  chassisNo: z.string().min(2).max(64).optional(),
-  motorNo: z.string().min(1).max(64).optional(),
-  controllerNo: z.string().min(1).max(64).optional(),
+  chassisNo: vehicleId(2, COMPONENT_ID_MAX, CHASSIS_NO_ERROR),
+  motorNo: vehicleId(1, COMPONENT_ID_MAX, MOTOR_NO_ERROR),
+  controllerNo: vehicleId(1, COMPONENT_ID_MAX, MOTOR_NO_ERROR),
 });
 export type VehicleInput = z.infer<typeof vehicleSchema>;
 
@@ -79,7 +113,7 @@ export async function listVehicles(): Promise<Vehicle[]> {
 }
 
 export async function createVehicle(input: VehicleInput): Promise<Vehicle> {
-  return apiPost<Vehicle>('/admin/vehicles', input);
+  return apiPost<Vehicle>('/admin/vehicles', vehicleSchema.parse(input));
 }
 
 export interface BulkVehicleRowResult {
@@ -114,13 +148,28 @@ export async function assignVehicle(input: AssignInput) {
 }
 
 export interface VehicleRecord {
-  chassisNo?: string | null;
-  motorNo?: string | null;
-  controllerNo?: string | null;
+  vehicleNo: string;
+  iopId: string;
+  chassisNo: string;
+  motorNo: string;
+  controllerNo: string;
 }
 
+export const vehicleRecordSchema = z.object({
+  vehicleNo: vehicleId(2, VEHICLE_NO_MAX, VEHICLE_NO_ERROR),
+  iopId: z
+    .string()
+    .trim()
+    .min(1)
+    .max(IOP_ID_MAX)
+    .refine(isIopId, { message: IOP_ID_ERROR }),
+  chassisNo: vehicleId(2, COMPONENT_ID_MAX, CHASSIS_NO_ERROR),
+  motorNo: vehicleId(1, COMPONENT_ID_MAX, MOTOR_NO_ERROR),
+  controllerNo: vehicleId(1, COMPONENT_ID_MAX, MOTOR_NO_ERROR),
+});
+
 export async function updateRecord(id: string, input: VehicleRecord) {
-  return apiPatch(`/admin/vehicles/${id}/record`, input);
+  return apiPatch(`/admin/vehicles/${id}/record`, vehicleRecordSchema.parse(input));
 }
 
 export interface ReplaceInput {

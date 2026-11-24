@@ -1,4 +1,5 @@
 /* Formatting + small helpers shared across the admin UI (ported 1:1 from the prototype's `U`). */
+import { formatRiderPhone } from "../rider-display";
 import type { Pos } from "./types";
 
 export const MIN = 60e3;
@@ -64,7 +65,7 @@ export const U = {
     return String(n).padStart(2, "0");
   },
   phone(p: string | null | undefined) {
-    return p ? "+91 " + String(p).slice(0, 5) + " " + String(p).slice(5) : "—";
+    return formatRiderPhone(p);
   },
   initials(name: string | null | undefined) {
     return String(name || "?")

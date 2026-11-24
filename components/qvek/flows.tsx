@@ -9,11 +9,36 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
+import type { Value } from "react-phone-number-input";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { AdminPhoneInput } from "@/components/ui/phone-input";
+import { riderIndianPhoneError, SUPPORT_PHONE_ERROR, toSupportPhoneE164 } from "@/lib/phone";
 import { useBulkCreateVehicles, useUpdateRecord, useCreateVehicle, useDisarmVehicle, useReactivateVehicle } from "@/features/fleet/hooks";
-import type { BulkVehiclesResult } from "@/features/fleet/api";
+import { vehicleRecordSchema, vehicleSchema, type BulkVehiclesResult } from "@/features/fleet/api";
+import {
+  CHASSIS_NO_ERROR,
+  COMPONENT_ID_MAX,
+  IOP_ID_ERROR,
+  IOP_ID_MAX,
+  MOTOR_NO_ERROR,
+  sanitizeIopIdInput,
+  sanitizeVehicleIdentifierInput,
+  VEHICLE_IDENTIFIER_ERROR,
+  VEHICLE_NO_ERROR,
+  VEHICLE_NO_MAX,
+  vehicleIdentifierError,
+  iopIdError,
+} from "@/features/fleet/identifiers";
 import { downloadTemplateXlsx, IMPORT_LIMIT, parseVehiclesFile, type ParsedImport } from "@/features/fleet/import";
+import {
+  addVehicleFieldError,
+  collectAddVehicleErrors,
+  formErrorsFromApiValidation,
+} from "@/features/fleet/validation-errors";
+import { AUDIT_REASON_MAX, auditReasonError } from "@/lib/audit-reason";
+import { ApiError } from "@/lib/api-client";
 import { useUpsertKyc } from "@/features/kyc/hooks";
 import { useVerifyPayment } from "@/features/payments/hooks";
 import { kycSchema } from "@/features/kyc/api";
@@ -66,7 +91,7 @@ export function ControlFlow({ id, op }: { id: string; op: "immobilize" | "reacti
           busy: busy ? "Sending to tracker…" : undefined,
           onClick: async () => {
             const reason = sel === "other" ? other.trim() : sel;
-            if (!reason) {
+            if (!reason || auditReasonError(reason)) {
               setErr(true);
               return false;
             }
@@ -118,10 +143,18 @@ export function ControlFlow({ id, op }: { id: string; op: "immobilize" | "reacti
           placeholder="Describe the reason"
           style={{ marginTop: 8 }}
           hidden={sel !== "other"}
+          maxLength={AUDIT_REASON_MAX}
           value={other}
-          onChange={(e) => setOther(e.target.value)}
+          onChange={(e) => {
+            setOther(e.target.value);
+            setErr(false);
+          }}
         />
-        {err ? <FieldError>Select or enter a reason.</FieldError> : null}
+        {err ? (
+          <FieldError>
+            {sel === "other" && other.trim() ? auditReasonError(other) ?? "Select or enter a reason." : "Select or enter a reason."}
+          </FieldError>
+        ) : null}
       </div>
       <p className="field__hint" style={{ marginTop: 10 }}>Sent through the backend to the IOP GPS relay. The vehicle flips state only after the relay confirms; failures keep the current state.</p>
     </Modal>
@@ -239,7 +272,8 @@ export function RejectFlow({ id }: { id: string }) {
           busy: reject.isPending ? "Rejecting…" : undefined,
           onClick: async () => {
             const v = reason.trim();
-            if (v.length < 3) {
+            const rErr = auditReasonError(v);
+            if (rErr) {
               setErr(true);
               return false;
             }
@@ -264,7 +298,7 @@ export function RejectFlow({ id }: { id: string }) {
           value={reason}
           onChange={(e) => setReason(e.target.value)}
         />
-        {err ? <FieldError>Enter a short reason (at least 3 characters).</FieldError> : null}
+        {err ? <FieldError>{auditReasonError(reason) ?? "Enter a short reason (at least 3 characters)."}</FieldError> : null}
       </div>
     </Modal>
   );
@@ -302,8 +336,9 @@ export function StatusFlow({ kind, id }: { kind: "rider" | "vehicle"; id: string
               setErr("Choose a different status.");
               return false;
             }
-            if (rs.length < 3) {
-              setErr("Add a short reason (at least 3 characters) — it is recorded in the audit log.");
+            const reasonErr = auditReasonError(rs);
+            if (reasonErr) {
+              setErr(reasonErr);
               return false;
             }
             const next = sel as AssetStatus;
@@ -311,7 +346,10 @@ export function StatusFlow({ kind, id }: { kind: "rider" | "vehicle"; id: string
             if (holder && (isR || SERVER_BACKED.has(next))) {
               try {
                 await transition.mutateAsync({ status: ASSET_TO_API[next], reason: rs });
-              } catch {
+              } catch (err) {
+                if (err instanceof ApiError && err.code === "VALIDATION_ERROR") {
+                  setErr(auditReasonError(rs) ?? err.message);
+                }
                 return false;
               }
             } else {
@@ -339,8 +377,18 @@ export function StatusFlow({ kind, id }: { kind: "rider" | "vehicle"; id: string
         <label htmlFor="st-reason">
           Reason / note <span className="req">*</span>
         </label>
-        <input className="input" id="st-reason" placeholder="Why is the status changing?" value={reason} onChange={(e) => setReason(e.target.value)} />
-        {err ? <FieldError>{err}</FieldError> : null}
+        <input
+          className="input"
+          id="st-reason"
+          maxLength={AUDIT_REASON_MAX}
+          placeholder="e.g. Rider unreachable — scooter parked at hub"
+          value={reason}
+          onChange={(e) => {
+            setReason(e.target.value);
+            if (err) setErr("");
+          }}
+        />
+        {err ? <FieldError>{err}</FieldError> : auditReasonError(reason) ? <FieldError>{auditReasonError(reason)}</FieldError> : null}
       </div>
       {isR ? (
         <p className="field__hint" style={{ marginTop: 8 }}>Every transition is audited with your name and reason. Blacklisted riders cannot be moved without a director override.</p>
@@ -358,14 +406,25 @@ export function ComponentsFlow({ id }: { id: string }) {
   const v = G.vehicle(id)!;
   const update = useUpdateRecord(id);
   const blank = (s: string) => (s === "—" ? "" : s);
+  const [vehicleNo, setVehicleNo] = useState(blank(v.regNo));
+  const [iopId, setIopId] = useState(blank(v.iopId ?? ""));
   const [chassis, setChassis] = useState(blank(v.chassisNo));
   const [motor, setMotor] = useState(blank(v.motorNo));
   const [ctrl, setCtrl] = useState(blank(v.controllerNo));
-  const [err, setErr] = useState("");
+  const [errs, setErrs] = useState<Record<string, string>>({});
+  const cls = (f: string, extra = "") => "field" + extra + (errs[f] ? " has-error" : "");
+  const fieldErr = (f: string) => (errs[f] ? <FieldError>{errs[f]}</FieldError> : null);
+  const live = {
+    vehicleNo: vehicleIdentifierError(vehicleNo, 2, false, VEHICLE_NO_MAX, VEHICLE_NO_ERROR),
+    iopId: iopIdError(iopId),
+    chassis: vehicleIdentifierError(chassis, 2, false, COMPONENT_ID_MAX, CHASSIS_NO_ERROR),
+    motor: vehicleIdentifierError(motor, 1, false, COMPONENT_ID_MAX, MOTOR_NO_ERROR),
+    controller: vehicleIdentifierError(ctrl, 1, false, COMPONENT_ID_MAX, MOTOR_NO_ERROR),
+  };
   return (
     <Modal
       title="Update vehicle record"
-      subtitle={"Chassis " + v.chassisNo + " (master record)"}
+      subtitle={`Registration ${v.regNo} · ${v.status}`}
       icon="cpu"
       size="md"
       actions={[
@@ -376,32 +435,62 @@ export function ComponentsFlow({ id }: { id: string }) {
           icon: "check",
           busy: update.isPending ? "Saving…" : undefined,
           onClick: async () => {
-            const ch = chassis.trim().toUpperCase();
-            const mo = motor.trim().toUpperCase();
-            const co = ctrl.trim().toUpperCase();
-            const re = /^[A-Z0-9-]{2,64}$/;
-            if ((ch && !re.test(ch)) || (mo && !re.test(mo)) || (co && !re.test(co))) {
-              setErr("Use letters, digits or hyphens (2–64 characters).");
+            const vn = sanitizeVehicleIdentifierInput(vehicleNo, VEHICLE_NO_MAX).trim().toUpperCase();
+            const io = sanitizeIopIdInput(iopId).trim();
+            const ch = sanitizeVehicleIdentifierInput(chassis).trim().toUpperCase();
+            const mo = sanitizeVehicleIdentifierInput(motor).trim().toUpperCase();
+            const co = sanitizeVehicleIdentifierInput(ctrl).trim().toUpperCase();
+            const e: Record<string, string> = {};
+            if (vehicleIdentifierError(vn, 2, false, VEHICLE_NO_MAX, VEHICLE_NO_ERROR)) {
+              e.vehicleNo = VEHICLE_NO_ERROR;
+            }
+            if (iopIdError(io)) e.iopId = IOP_ID_ERROR;
+            if (vehicleIdentifierError(ch, 2, false, COMPONENT_ID_MAX, CHASSIS_NO_ERROR)) {
+              e.chassis = CHASSIS_NO_ERROR;
+            }
+            if (vehicleIdentifierError(mo, 1, false, COMPONENT_ID_MAX, MOTOR_NO_ERROR)) {
+              e.motor = MOTOR_NO_ERROR;
+            }
+            if (vehicleIdentifierError(co, 1, false, COMPONENT_ID_MAX, MOTOR_NO_ERROR)) {
+              e.controller = MOTOR_NO_ERROR;
+            }
+            setErrs(e);
+            if (Object.keys(e).length) return false;
+            const parsed = vehicleRecordSchema.safeParse({
+              vehicleNo: vn,
+              iopId: io,
+              chassisNo: ch,
+              motorNo: mo,
+              controllerNo: co,
+            });
+            if (!parsed.success) {
+              const toFormField = (path: string) =>
+                ({ chassisNo: 'chassis', motorNo: 'motor', controllerNo: 'controller' }[path] ?? path);
+              for (const issue of parsed.error.issues) {
+                const key = toFormField(String(issue.path[0] ?? ''));
+                if (key && !e[key]) e[key] = issue.message;
+              }
+              setErrs(e);
               return false;
             }
-            const patch = {
-              ...(ch && ch !== blank(v.chassisNo) ? { chassisNo: ch } : {}),
-              ...(mo && mo !== blank(v.motorNo) ? { motorNo: mo } : {}),
-              ...(co && co !== blank(v.controllerNo) ? { controllerNo: co } : {}),
-            };
-            if (!Object.keys(patch).length) {
-              setErr("No changes to save.");
-              return false;
-            }
-            const dupe = store.state.vehicles.find((x) => x.id !== v.id && ((patch.chassisNo && x.chassisNo === patch.chassisNo) || (patch.motorNo && x.motorNo === patch.motorNo) || (patch.controllerNo && x.controllerNo === patch.controllerNo)));
+            const patch = parsed.data;
+            const dupe = store.state.vehicles.find(
+              (x) =>
+                x.id !== v.id &&
+                (x.regNo.toLowerCase() === patch.vehicleNo.toLowerCase() ||
+                  (x.iopId && x.iopId.toLowerCase() === patch.iopId.toLowerCase()) ||
+                  x.chassisNo === patch.chassisNo),
+            );
             if (dupe) {
-              setErr("That number is already linked to " + dupe.regNo + ".");
+              setErrs({ vehicleNo: `That number is already linked to ${dupe.regNo}.` });
               return false;
             }
             try {
-              // The hook toasts success / the server's error code (features/fleet/hooks.ts).
               await update.mutateAsync(patch);
-            } catch {
+            } catch (err) {
+              if (err instanceof ApiError && err.code === "VALIDATION_ERROR") {
+                setErrs(formErrorsFromApiValidation(err.message));
+              }
               return false;
             }
           },
@@ -413,23 +502,77 @@ export function ComponentsFlow({ id }: { id: string }) {
         <span>Use this when a chassis, motor or controller number changes. The previous number is kept in the vehicle history.</span>
       </div>
       <div className="form-grid">
-        <div className="field span-2">
-          <label htmlFor="cm-chassis">Chassis No. (master)</label>
-          <input className="input" id="cm-chassis" value={chassis} onChange={(e) => setChassis(e.target.value)} autoComplete="off" />
-          <div className="field__hint">Current: {v.chassisNo}</div>
+        <div className={cls("vehicleNo")}>
+          <label htmlFor="cm-vehicle">
+            Registration No. <span className="req">*</span>
+          </label>
+          <input
+            className="input"
+            id="cm-vehicle"
+            maxLength={VEHICLE_NO_MAX}
+            value={vehicleNo}
+            onChange={(e) => setVehicleNo(sanitizeVehicleIdentifierInput(e.target.value, VEHICLE_NO_MAX))}
+            autoComplete="off"
+          />
+          {fieldErr("vehicleNo") ?? (live.vehicleNo ? <FieldError>{live.vehicleNo}</FieldError> : null)}
         </div>
-        <div className="field">
-          <label htmlFor="cm-motor">Motor No.</label>
-          <input className="input" id="cm-motor" value={motor} onChange={(e) => setMotor(e.target.value)} autoComplete="off" />
-          <div className="field__hint">Current: {v.motorNo}</div>
+        <div className={cls("iopId")}>
+          <label htmlFor="cm-iop">
+            IOP device ID <span className="req">*</span>
+          </label>
+          <input
+            className="input"
+            id="cm-iop"
+            maxLength={IOP_ID_MAX}
+            value={iopId}
+            onChange={(e) => setIopId(sanitizeIopIdInput(e.target.value))}
+            autoComplete="off"
+          />
+          {fieldErr("iopId") ?? (live.iopId ? <FieldError>{live.iopId}</FieldError> : null)}
         </div>
-        <div className="field">
-          <label htmlFor="cm-ctrl">Controller No.</label>
-          <input className="input" id="cm-ctrl" value={ctrl} onChange={(e) => setCtrl(e.target.value)} autoComplete="off" />
-          <div className="field__hint">Current: {v.controllerNo}</div>
+        <div className={cls("chassis", " span-2")}>
+          <label htmlFor="cm-chassis">
+            Chassis No. (master) <span className="req">*</span>
+          </label>
+          <input
+            className="input"
+            id="cm-chassis"
+            maxLength={COMPONENT_ID_MAX}
+            value={chassis}
+            onChange={(e) => setChassis(sanitizeVehicleIdentifierInput(e.target.value))}
+            autoComplete="off"
+          />
+          {fieldErr("chassis") ?? (live.chassis ? <FieldError>{live.chassis}</FieldError> : null)}
+        </div>
+        <div className={cls("motor")}>
+          <label htmlFor="cm-motor">
+            Motor No. <span className="req">*</span>
+          </label>
+          <input
+            className="input"
+            id="cm-motor"
+            maxLength={COMPONENT_ID_MAX}
+            value={motor}
+            onChange={(e) => setMotor(sanitizeVehicleIdentifierInput(e.target.value))}
+            autoComplete="off"
+          />
+          {fieldErr("motor") ?? (live.motor ? <FieldError>{live.motor}</FieldError> : null)}
+        </div>
+        <div className={cls("controller")}>
+          <label htmlFor="cm-ctrl">
+            Controller No. <span className="req">*</span>
+          </label>
+          <input
+            className="input"
+            id="cm-ctrl"
+            maxLength={COMPONENT_ID_MAX}
+            value={ctrl}
+            onChange={(e) => setCtrl(sanitizeVehicleIdentifierInput(e.target.value))}
+            autoComplete="off"
+          />
+          {fieldErr("controller") ?? (live.controller ? <FieldError>{live.controller}</FieldError> : null)}
         </div>
       </div>
-      {err ? <FieldError style={{ marginTop: 8 }}>{err}</FieldError> : null}
     </Modal>
   );
 }
@@ -445,6 +588,13 @@ export function AddVehicleFlow() {
   const [errs, setErrs] = useState<Record<string, string>>({});
   const cls = (f: string, extra = "") => "field" + extra + (errs[f] ? " has-error" : "");
   const err = (f: string) => (errs[f] ? <FieldError>{errs[f]}</FieldError> : null);
+  const live = {
+    vehicleNo: addVehicleFieldError("vehicleNo", vehicleNo),
+    iopId: addVehicleFieldError("iopId", iopId),
+    chassis: addVehicleFieldError("chassis", chassis),
+    motor: addVehicleFieldError("motor", motor),
+    controller: addVehicleFieldError("controller", ctrl),
+  };
   return (
     <Modal
       title="Add vehicle"
@@ -459,24 +609,45 @@ export function AddVehicleFlow() {
           icon: "plus",
           busy: create.isPending ? "Adding…" : undefined,
           onClick: async () => {
-            const e: Record<string, string> = {};
-            const vn = vehicleNo.trim();
-            const io = iopId.trim();
-            const ch = chassis.trim();
-            if (vn.length < 2) e.vehicleNo = "Enter the vehicle number (e.g. QVEK-003).";
-            if (!io) e.iopId = "Enter the IOP device id.";
-            if (ch && ch.length < 2) e.chassis = "Chassis number is too short.";
+            const vn = sanitizeVehicleIdentifierInput(vehicleNo, VEHICLE_NO_MAX).trim().toUpperCase();
+            const io = sanitizeIopIdInput(iopId).trim();
+            const ch = sanitizeVehicleIdentifierInput(chassis).trim().toUpperCase();
+            const mo = sanitizeVehicleIdentifierInput(motor).trim().toUpperCase();
+            const co = sanitizeVehicleIdentifierInput(ctrl).trim().toUpperCase();
+            const e = collectAddVehicleErrors({
+              vehicleNo: vn,
+              iopId: io,
+              chassis: ch,
+              motor: mo,
+              controller: co,
+            });
             setErrs(e);
             if (Object.keys(e).length) return false;
+            const payload = vehicleSchema.safeParse({
+              vehicleNo: vn,
+              iopId: io,
+              chassisNo: ch,
+              motorNo: mo,
+              controllerNo: co,
+            });
+            if (!payload.success) {
+              setErrs(
+                collectAddVehicleErrors({
+                  vehicleNo: vn,
+                  iopId: io,
+                  chassis: ch,
+                  motor: mo,
+                  controller: co,
+                }),
+              );
+              return false;
+            }
             try {
-              await create.mutateAsync({
-                vehicleNo: vn,
-                iopId: io,
-                ...(ch ? { chassisNo: ch } : {}),
-                ...(motor.trim() ? { motorNo: motor.trim() } : {}),
-                ...(ctrl.trim() ? { controllerNo: ctrl.trim() } : {}),
-              });
-            } catch {
+              await create.mutateAsync(payload.data);
+            } catch (err) {
+              if (err instanceof ApiError && err.code === "VALIDATION_ERROR") {
+                setErrs(formErrorsFromApiValidation(err.message));
+              }
               return false;
             }
           },
@@ -489,28 +660,72 @@ export function AddVehicleFlow() {
             <label htmlFor="av-no">
               Vehicle number <span className="req">*</span>
             </label>
-            <input className="input" id="av-no" autoComplete="off" placeholder="e.g. QVEK-003" value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} />
-            {err("vehicleNo")}
+            <input
+              className="input"
+              id="av-no"
+              autoComplete="off"
+              placeholder="e.g. QVEK-003"
+              maxLength={VEHICLE_NO_MAX}
+              value={vehicleNo}
+              onChange={(e) => setVehicleNo(sanitizeVehicleIdentifierInput(e.target.value, VEHICLE_NO_MAX))}
+            />
+            {err("vehicleNo") ?? (live.vehicleNo ? <FieldError>{live.vehicleNo}</FieldError> : null)}
           </div>
           <div className={cls("iopId")}>
             <label htmlFor="av-iop">
               IOP device id <span className="req">*</span>
             </label>
-            <input className="input" id="av-iop" autoComplete="off" value={iopId} onChange={(e) => setIopId(e.target.value)} />
-            {err("iopId")}
+            <input
+              className="input"
+              id="av-iop"
+              autoComplete="off"
+              maxLength={IOP_ID_MAX}
+              value={iopId}
+              onChange={(e) => setIopId(sanitizeIopIdInput(e.target.value))}
+            />
+            {err("iopId") ?? (live.iopId ? <FieldError>{live.iopId}</FieldError> : null)}
           </div>
           <div className={cls("chassis", " span-2")}>
-            <label htmlFor="av-chassis">Chassis No. (master record)</label>
-            <input className="input" id="av-chassis" autoComplete="off" value={chassis} onChange={(e) => setChassis(e.target.value)} />
-            {err("chassis")}
+            <label htmlFor="av-chassis">
+              Chassis No. (master record) <span className="req">*</span>
+            </label>
+            <input
+              className="input"
+              id="av-chassis"
+              autoComplete="off"
+              maxLength={COMPONENT_ID_MAX}
+              value={chassis}
+              onChange={(e) => setChassis(sanitizeVehicleIdentifierInput(e.target.value))}
+            />
+            {err("chassis") ?? (live.chassis ? <FieldError>{live.chassis}</FieldError> : null)}
           </div>
-          <div className="field">
-            <label htmlFor="av-motor">Motor No.</label>
-            <input className="input" id="av-motor" autoComplete="off" value={motor} onChange={(e) => setMotor(e.target.value)} />
+          <div className={cls("motor")}>
+            <label htmlFor="av-motor">
+              Motor No. <span className="req">*</span>
+            </label>
+            <input
+              className="input"
+              id="av-motor"
+              autoComplete="off"
+              maxLength={COMPONENT_ID_MAX}
+              value={motor}
+              onChange={(e) => setMotor(sanitizeVehicleIdentifierInput(e.target.value))}
+            />
+            {err("motor") ?? (live.motor ? <FieldError>{live.motor}</FieldError> : null)}
           </div>
-          <div className="field">
-            <label htmlFor="av-ctrl">Controller No.</label>
-            <input className="input" id="av-ctrl" autoComplete="off" value={ctrl} onChange={(e) => setCtrl(e.target.value)} />
+          <div className={cls("controller")}>
+            <label htmlFor="av-ctrl">
+              Controller No. <span className="req">*</span>
+            </label>
+            <input
+              className="input"
+              id="av-ctrl"
+              autoComplete="off"
+              maxLength={COMPONENT_ID_MAX}
+              value={ctrl}
+              onChange={(e) => setCtrl(sanitizeVehicleIdentifierInput(e.target.value))}
+            />
+            {err("controller") ?? (live.controller ? <FieldError>{live.controller}</FieldError> : null)}
           </div>
         </div>
       </form>
@@ -783,7 +998,8 @@ export function EditRiderFlow({ id }: { id: string }) {
   const save = useUpdateRider(id);
   const known = L.platforms.includes(r.platform);
   const [name, setName] = useState(r.name);
-  const [phone, setPhone] = useState(r.phone);
+  const [phone, setPhone] = useState<Value | undefined>(r.phone || undefined);
+  const phoneLiveErr = riderIndianPhoneError(phone);
   const [age, setAge] = useState(String(r.age));
   const [platform, setPlatform] = useState(known ? r.platform : "Other");
   const [other, setOther] = useState(known ? "" : r.platform);
@@ -809,13 +1025,14 @@ export function EditRiderFlow({ id }: { id: string }) {
           busy: save.isPending ? "Saving…" : undefined,
           onClick: async () => {
             const nm = name.trim().replace(/\s+/g, " ");
-            const ph = phone.trim().replace(/\D/g, "");
+            const normalizedPhone = toSupportPhoneE164(phone);
+            const ph = normalizedPhone?.replace(/\D/g, "") ?? "";
             const ag = Number(age.trim());
             const isOther = platform === "Other";
             const pf = isOther ? other.trim() : platform;
             const e: Record<string, string> = {};
             if (nm.length < 3 || !/^[A-Za-z][A-Za-z .'-]+$/.test(nm)) e.name = "Enter the full name (letters only, at least 3 characters).";
-            if (!/^[6-9]\d{9}$/.test(ph.slice(-10)) || ph.length < 10) e.phone = "Enter a valid 10-digit mobile number.";
+            if (!normalizedPhone?.startsWith("+91")) e.phone = SUPPORT_PHONE_ERROR;
             if (!ag || ag < 16 || ag > 100) e.age = "Age must be between 16 and 100.";
             if (!pf) e[isOther ? "other" : "platform"] = "Enter the platform name.";
             const dupe = store.state.riders.find((x) => x.id !== id && x.phone.replace(/\D/g, "").slice(-10) === ph.slice(-10) && x.application.status !== "rejected");
@@ -824,7 +1041,7 @@ export function EditRiderFlow({ id }: { id: string }) {
             if (Object.keys(e).length) return false;
             const patch: { name?: string; phone?: string; age?: number; platform?: string } = {};
             if (nm !== r.name) patch.name = nm;
-            if (ph !== r.phone) patch.phone = ph;
+            if (normalizedPhone && normalizedPhone !== r.phone) patch.phone = normalizedPhone;
             if (ag !== r.age) patch.age = ag;
             if (pf !== r.platform) patch.platform = pf;
             if (!Object.keys(patch).length) {
@@ -854,12 +1071,16 @@ export function EditRiderFlow({ id }: { id: string }) {
             <label htmlFor="er-phone">
               Mobile number <span className="req">*</span>
             </label>
-            <div className="input-prefix">
-              <span>+91</span>
-              <input id="er-phone" inputMode="numeric" maxLength={13} value={phone} onChange={(e) => setPhone(e.target.value)} />
-            </div>
+            <AdminPhoneInput
+              id="er-phone"
+              countries={["IN"]}
+              value={phone}
+              onChange={setPhone}
+              hasError={!!errs.phone || !!phoneLiveErr}
+              placeholder="Enter mobile number"
+            />
             <div className="field__hint">The rider signs in with this number.</div>
-            {err("phone")}
+            {errs.phone ? err("phone") : phoneLiveErr ? <FieldError>{phoneLiveErr}</FieldError> : null}
           </div>
           <div className={fieldCls("age")}>
             <label htmlFor="er-age">
@@ -988,7 +1209,8 @@ export function AddRiderFlow({ onAdded }: { onAdded: (riderId: string) => void }
   const qc = useQueryClient();
   const create = useCreateRider();
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState<Value | undefined>(undefined);
+  const phoneLiveErr = riderIndianPhoneError(phone);
   const [age, setAge] = useState("");
   const [platform, setPlatform] = useState("");
   const [errs, setErrs] = useState<Record<string, string>>({});
@@ -1010,18 +1232,23 @@ export function AddRiderFlow({ onAdded }: { onAdded: (riderId: string) => void }
           busy: create.isPending ? "Adding…" : undefined,
           onClick: async () => {
             const nm = name.trim();
-            const ph = phone.trim().replace(/\D/g, "");
+            const normalizedPhone = toSupportPhoneE164(phone);
             const ag = age.trim() ? Number(age.trim()) : undefined;
             const pf = platform.trim();
             const e: Record<string, string> = {};
             if (nm.length < 2) e.name = "Enter the full name.";
-            if (!/^[6-9]\d{9}$/.test(ph)) e.phone = "Enter a valid 10-digit mobile number.";
-            else if (G.riderByPhone("+91" + ph)) e.phone = "This number is already registered.";
+            if (!normalizedPhone?.startsWith("+91")) e.phone = SUPPORT_PHONE_ERROR;
+            else if (G.riderByPhone(normalizedPhone)) e.phone = "This number is already registered.";
             if (ag !== undefined && (!ag || ag < 16 || ag > 100)) e.age = "Age must be between 16 and 100.";
             setErrs(e);
             if (Object.keys(e).length) return false;
             try {
-              const rider = await create.mutateAsync({ name: nm, phone: "+91" + ph, ...(ag ? { age: ag } : {}), ...(pf ? { platform: pf } : {}) });
+              const rider = await create.mutateAsync({
+                name: nm,
+                phone: normalizedPhone!,
+                ...(ag ? { age: ag } : {}),
+                ...(pf ? { platform: pf } : {}),
+              });
               // Wait for the rider list to include the new rider before opening their drawer.
               await qc.refetchQueries({ queryKey: riderKeys.all });
               setTimeout(() => onAdded(rider.id), 150);
@@ -1045,11 +1272,15 @@ export function AddRiderFlow({ onAdded }: { onAdded: (riderId: string) => void }
             <label htmlFor="ar-phone">
               Mobile number <span className="req">*</span>
             </label>
-            <div className="input-prefix">
-              <span>+91</span>
-              <input id="ar-phone" inputMode="numeric" maxLength={10} placeholder="10-digit number" value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} />
-            </div>
-            {err("phone")}
+            <AdminPhoneInput
+              id="ar-phone"
+              countries={["IN"]}
+              value={phone}
+              onChange={setPhone}
+              hasError={!!errs.phone || !!phoneLiveErr}
+              placeholder="Enter mobile number"
+            />
+            {errs.phone ? err("phone") : phoneLiveErr ? <FieldError>{phoneLiveErr}</FieldError> : null}
           </div>
           <div className={fieldCls("age")}>
             <label htmlFor="ar-age">Age</label>
@@ -1102,7 +1333,7 @@ export function FinDetailFlow({ id, onOpenRider }: { id: string; onOpenRider: (r
                 busy: verify.isPending ? "Verifying…" : undefined,
                 onClick: async () => {
                   const rs = reason.trim();
-                  if (rs.length < 3) {
+                  if (auditReasonError(rs)) {
                     setReasonErr(true);
                     return false;
                   }
@@ -1166,6 +1397,7 @@ export function FinDetailFlow({ id, onOpenRider }: { id: string; onOpenRider: (r
             <input
               className="input"
               id="fin-verify-reason"
+              maxLength={AUDIT_REASON_MAX}
               placeholder="e.g. UPI credited, webhook never arrived"
               value={reason}
               onChange={(ev) => {
@@ -1173,7 +1405,9 @@ export function FinDetailFlow({ id, onOpenRider }: { id: string; onOpenRider: (r
                 setReasonErr(false);
               }}
             />
-            {reasonErr ? <FieldError>Enter why you are verifying (at least 3 characters) — recorded in the audit log.</FieldError> : null}
+            {reasonErr ? (
+              <FieldError>{auditReasonError(reason) ?? "Enter why you are verifying — recorded in the audit log."}</FieldError>
+            ) : null}
             <p className="field__hint" style={{ marginTop: 8 }}>
               Only use this when the money actually arrived but the gateway webhook was lost. It runs the same capture path as the webhook (extends the rental, reactivates after grace) and is audited with your name.
             </p>
@@ -1219,8 +1453,13 @@ export function ManualRecoveryFlow() {
           busy: transition.isPending || disarm.isPending ? "Saving…" : undefined,
           onClick: async () => {
             const rs = reason.trim();
-            if (!veh || !veh.riderId || rs.length < 3) {
+            if (!veh || !veh.riderId) {
               setErr("Choose a vehicle and enter a reason (at least 3 characters).");
+              return false;
+            }
+            const reasonErr = auditReasonError(rs);
+            if (reasonErr) {
+              setErr(reasonErr);
               return false;
             }
             try {
@@ -1257,7 +1496,17 @@ export function ManualRecoveryFlow() {
         <label htmlFor="mr-r">
           Reason <span className="req">*</span>
         </label>
-        <input className="input" id="mr-r" placeholder="e.g. Rider unreachable for 3 days" value={reason} onChange={(e) => setReason(e.target.value)} />
+        <input
+          className="input"
+          id="mr-r"
+          maxLength={AUDIT_REASON_MAX}
+          placeholder="e.g. Rider unreachable for 3 days"
+          value={reason}
+          onChange={(e) => {
+            setReason(e.target.value);
+            if (err) setErr("");
+          }}
+        />
       </div>
       <label className="check" style={{ marginTop: 12 }}>
         <input type="checkbox" id="mr-imm" checked={imm} onChange={(e) => setImm(e.target.checked)} /> Also immobilize the vehicle now (via IOP relay)

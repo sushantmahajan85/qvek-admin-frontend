@@ -225,9 +225,9 @@ export const TEMPLATE_FILE = 'qvek-vehicles-template.xlsx';
 const FIELD_GUIDE: Array<[string, string, string, string]> = [
   ['Vehicle No.', 'Required', 'QVEK-001', 'Fleet registration number shown across the admin'],
   ['IOP ID', 'Required', 'IOP-10001', 'Tracker/IMEI bound to this scooter. Must be unique'],
-  ['Chassis No.', 'Optional', 'CH-10001', 'Master record; also unique when present'],
-  ['Motor No.', 'Optional', 'MT-10001', 'Kept in component history on replacement'],
-  ['Controller No.', 'Optional', 'CT-10001', 'Kept in component history on replacement'],
+  ['Chassis No.', 'Required', 'CH-10001', 'Master record; must be unique across the fleet'],
+  ['Motor No.', 'Required', 'MT-10001', 'Kept in component history on replacement'],
+  ['Controller No.', 'Required', 'CT-10001', 'Kept in component history on replacement'],
   ['Type', 'Optional', 'LIGHT_2W', 'Defaults to LIGHT_2W when left blank'],
 ];
 

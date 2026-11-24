@@ -24,19 +24,27 @@ describe('parseVehiclesFile', () => {
         'Vehicle Number,IOT ID,Chassis Number,Motor No.,Controller No.',
         'QVEK-001,IOP-10001,CH-1,MT-1,CT-1',
         'QVEK-002,IOP-10002,,,',
+        'QVEK-003,IOP-10003,CH-10003,MT-10003,CT-10003',
       ]),
     );
-    expect(parsed.total).toBe(2);
-    expect(parsed.issues).toEqual([]);
+    expect(parsed.total).toBe(3);
+    expect(parsed.issues).toHaveLength(1);
+    expect(parsed.issues[0]?.row).toBe(3);
     expect(parsed.rows).toEqual([
       { vehicleNo: 'QVEK-001', iopId: 'IOP-10001', chassisNo: 'CH-1', motorNo: 'MT-1', controllerNo: 'CT-1', row: 2 },
-      { vehicleNo: 'QVEK-002', iopId: 'IOP-10002', row: 3 },
+      { vehicleNo: 'QVEK-003', iopId: 'IOP-10003', chassisNo: 'CH-10003', motorNo: 'MT-10003', controllerNo: 'CT-10003', row: 4 },
     ]);
   });
 
   it('finds the header below title rows', async () => {
     const parsed = await parseVehiclesFile(
-      csvFile(['Qvek fleet upload', 'Generated 2026-10-31', '', 'Vehicle No.,IOP ID', 'QVEK-1,IOP-1']),
+      csvFile([
+        'Qvek fleet upload',
+        'Generated 2026-10-31',
+        '',
+        'Vehicle No.,IOP ID,Chassis No.,Motor No.,Controller No.',
+        'QVEK-1,IOP-1,CH-1,MT-1,CT-1',
+      ]),
     );
     expect(parsed.rows).toHaveLength(1);
     expect(parsed.rows[0].row).toBe(5);
@@ -56,7 +64,12 @@ describe('parseVehiclesFile', () => {
 
   it('flags in-file duplicates case-insensitively and keeps the first', async () => {
     const parsed = await parseVehiclesFile(
-      csvFile(['Vehicle No.,IOP ID', 'QVEK-1,IOP-1', 'QVEK-2,IOP-1', 'QVEK-1,IOP-3']),
+      csvFile([
+        'Vehicle No.,IOP ID,Chassis No.,Motor No.,Controller No.',
+        'QVEK-1,IOP-1,CH-1,MT-1,CT-1',
+        'QVEK-2,IOP-1,CH-2,MT-2,CT-2',
+        'QVEK-1,IOP-3,CH-3,MT-3,CT-3',
+      ]),
     );
     expect(parsed.rows).toHaveLength(1);
     expect(parsed.issues.map((i) => i.row)).toEqual([3, 4]);
@@ -65,8 +78,10 @@ describe('parseVehiclesFile', () => {
   });
 
   it('refuses a sheet above the import limit', async () => {
-    const lines = ['Vehicle No.,IOP ID'];
-    for (let i = 0; i < IMPORT_LIMIT + 1; i += 1) lines.push(`QVEK-${i},IOP-${i}`);
+    const lines = ['Vehicle No.,IOP ID,Chassis No.,Motor No.,Controller No.'];
+    for (let i = 0; i < IMPORT_LIMIT + 1; i += 1) {
+      lines.push(`QVEK-${i},IOP-${i},CH-${i},MT-${i},CT-${i}`);
+    }
     await expect(parseVehiclesFile(csvFile(lines))).rejects.toThrow(/limit is 500/);
   });
 

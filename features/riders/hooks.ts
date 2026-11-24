@@ -67,7 +67,10 @@ export function useTransitionRider(id: string) {
       invalidate(qc, id);
       toast.success('Status updated');
     },
-    onError: (e) => toast.error(errorText(e instanceof ApiError ? e.code : undefined)),
+    onError: (e) => {
+      if (e instanceof ApiError && e.code === 'VALIDATION_ERROR') return;
+      toast.error(errorText(e instanceof ApiError ? e.code : undefined));
+    },
   });
 }
 
