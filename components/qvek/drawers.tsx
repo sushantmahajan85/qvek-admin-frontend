@@ -65,6 +65,10 @@ export function VehicleDrawerBody({ v, fin, onFin }: { v: Vehicle; fin: string; 
           <dd className="cell-mono">{v.motorNo}</dd>
           <dt>Controller No.</dt>
           <dd className="cell-mono">{v.controllerNo}</dd>
+          <dt>Driver ID</dt>
+          <dd className="cell-mono">{v.driverId}</dd>
+          <dt>Battery ID</dt>
+          <dd className="cell-mono">{v.batteryId}</dd>
           <dt>Registration No.</dt>
           <dd><Plate v={v} /></dd>
           <dt>IOP device ID</dt>

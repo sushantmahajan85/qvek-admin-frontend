@@ -71,7 +71,11 @@ export function VehiclesPage() {
       </div>
       <section className="card">
         <div className="toolbar">
-          <SearchBox value={st.q} onChange={(q) => setSt({ q, page: 1 })} placeholder="Search vehicle, IOP id, chassis, motor, controller or rider" />
+          <SearchBox
+            value={st.q}
+            onChange={(q) => setSt({ q, page: 1 })}
+            placeholder="Search vehicle, IOP, chassis, motor, controller, driver, battery or rider"
+          />
           <div className="chip-filter" role="group" aria-label="Status filter">
             {opts.map((o) => (
               <button key={o[0]} type="button" aria-pressed={st.filter === o[0]} onClick={() => setSt({ filter: o[0], page: 1 })}>
@@ -94,6 +98,7 @@ export function VehiclesPage() {
                       <th>IOP ID</th>
                       <th>Motor No.</th>
                       <th>Controller No.</th>
+                      <th>Driver / Battery ID</th>
                       <th>Status</th>
                       <th>Rider</th>
                       <SortTh label="Odometer" sortKey="odo" sort={st.sort} onSort={onSort} className="num" />
@@ -122,6 +127,14 @@ export function VehiclesPage() {
                           </td>
                           <td data-label="Controller No.">
                             <span className="cell-mono">{v.controllerNo}</span>
+                          </td>
+                          <td data-label="Driver / Battery ID">
+                            <span className="cell-mono" style={{ display: "block" }}>
+                              {v.driverId || "—"}
+                            </span>
+                            <span className="cell-sub cell-mono" style={{ display: "block" }}>
+                              {v.batteryId || "—"}
+                            </span>
                           </td>
                           <td data-label="Status" className="cell-full">
                             <div className="badge-row">

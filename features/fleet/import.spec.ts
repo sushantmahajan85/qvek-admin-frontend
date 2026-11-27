@@ -23,21 +23,44 @@ describe('parseCsv', () => {
 });
 
 describe('parseVehiclesFile', () => {
+  const hdr =
+    'Vehicle No.,IOP ID,Chassis No.,Motor No.,Controller No.,Driver ID,Battery ID';
+  const full = (vehicle: string, iop: string, ch: string, mt: string, ct: string, dr: string, ba: string) =>
+    `${vehicle},${iop},${ch},${mt},${ct},${dr},${ba}`;
+
   it('accepts tolerant header names and returns clean rows', async () => {
     const parsed = await parseVehiclesFile(
       csvFile([
-        'Vehicle Number,IOT ID,Chassis Number,Motor No.,Controller No.',
-        `QVEK-001,${I1},CH-1,MT-1,CT-1`,
-        `QVEK-002,${I2},,,`,
-        `QVEK-003,${I3},CH-10003,MT-10003,CT-10003`,
+        'Vehicle Number,IOT ID,Chassis Number,Motor No.,Controller No.,Driver ID,Battery ID',
+        full('QVEK-001', I1, 'CH-1', 'MT-1', 'CT-1', 'DR-1', 'BAT-1'),
+        full('QVEK-002', I2, '', '', '', '', ''),
+        full('QVEK-003', I3, 'CH-10003', 'MT-10003', 'CT-10003', 'DR-10003', 'BAT-10003'),
       ]),
     );
     expect(parsed.total).toBe(3);
     expect(parsed.issues).toHaveLength(1);
     expect(parsed.issues[0]?.row).toBe(3);
     expect(parsed.rows).toEqual([
-      { vehicleNo: 'QVEK-001', iopId: I1, chassisNo: 'CH-1', motorNo: 'MT-1', controllerNo: 'CT-1', row: 2 },
-      { vehicleNo: 'QVEK-003', iopId: I3, chassisNo: 'CH-10003', motorNo: 'MT-10003', controllerNo: 'CT-10003', row: 4 },
+      {
+        vehicleNo: 'QVEK-001',
+        iopId: I1,
+        chassisNo: 'CH-1',
+        motorNo: 'MT-1',
+        controllerNo: 'CT-1',
+        driverId: 'DR-1',
+        batteryId: 'BAT-1',
+        row: 2,
+      },
+      {
+        vehicleNo: 'QVEK-003',
+        iopId: I3,
+        chassisNo: 'CH-10003',
+        motorNo: 'MT-10003',
+        controllerNo: 'CT-10003',
+        driverId: 'DR-10003',
+        batteryId: 'BAT-10003',
+        row: 4,
+      },
     ]);
   });
 
@@ -47,8 +70,8 @@ describe('parseVehiclesFile', () => {
         'Qvek fleet upload',
         'Generated 2026-10-31',
         '',
-        'Vehicle No.,IOP ID,Chassis No.,Motor No.,Controller No.',
-        `QVEK-1,${I1},CH-1,MT-1,CT-1`,
+        hdr,
+        full('QVEK-1', I1, 'CH-1', 'MT-1', 'CT-1', 'DR-1', 'BAT-1'),
       ]),
     );
     expect(parsed.rows).toHaveLength(1);
@@ -56,9 +79,7 @@ describe('parseVehiclesFile', () => {
   });
 
   it('reports invalid cells with the sheet row number', async () => {
-    const parsed = await parseVehiclesFile(
-      csvFile(['Vehicle No.,IOP ID', `,${I1}`, 'Q,IOP-2']),
-    );
+    const parsed = await parseVehiclesFile(csvFile(['Vehicle No.,IOP ID', `,${I1}`, 'Q,IOP-2']));
     expect(parsed.rows).toHaveLength(0);
     expect(parsed.issues).toHaveLength(2);
     expect(parsed.issues[0]).toMatchObject({ row: 2 });
@@ -70,10 +91,10 @@ describe('parseVehiclesFile', () => {
   it('flags in-file duplicates case-insensitively and keeps the first', async () => {
     const parsed = await parseVehiclesFile(
       csvFile([
-        'Vehicle No.,IOP ID,Chassis No.,Motor No.,Controller No.',
-        `QVEK-1,${I1},CH-1,MT-1,CT-1`,
-        `QVEK-2,${I1},CH-2,MT-2,CT-2`,
-        `QVEK-1,${I3},CH-3,MT-3,CT-3`,
+        hdr,
+        full('QVEK-1', I1, 'CH-1', 'MT-1', 'CT-1', 'DR-1', 'BAT-1'),
+        full('QVEK-2', I1, 'CH-2', 'MT-2', 'CT-2', 'DR-2', 'BAT-2'),
+        full('QVEK-1', I3, 'CH-3', 'MT-3', 'CT-3', 'DR-3', 'BAT-3'),
       ]),
     );
     expect(parsed.rows).toHaveLength(1);
@@ -83,9 +104,9 @@ describe('parseVehiclesFile', () => {
   });
 
   it('refuses a sheet above the import limit', async () => {
-    const lines = ['Vehicle No.,IOP ID,Chassis No.,Motor No.,Controller No.'];
+    const lines = [hdr];
     for (let i = 0; i < IMPORT_LIMIT + 1; i += 1) {
-      lines.push(`QVEK-${i},${imei(i)},CH-${i},MT-${i},CT-${i}`);
+      lines.push(full(`QVEK-${i}`, imei(i), `CH-${i}`, `MT-${i}`, `CT-${i}`, `DR-${i}`, `BAT-${i}`));
     }
     await expect(parseVehiclesFile(csvFile(lines))).rejects.toThrow(/limit is 500/);
   });
@@ -104,7 +125,16 @@ describe('downloadable template', () => {
   it('has the exact required headers and they survive the xlsx round-trip', async () => {
     const sheets = buildTemplateSheets();
     const headers = (sheets[0].data[0] as Array<{ value?: unknown }>).map((c) => c.value);
-    expect(headers).toEqual(['Vehicle No.', 'IOP ID', 'Chassis No.', 'Motor No.', 'Controller No.', 'Type']);
+    expect(headers).toEqual([
+      'Vehicle No.',
+      'IOP ID',
+      'Chassis No.',
+      'Motor No.',
+      'Controller No.',
+      'Driver ID',
+      'Battery ID',
+      'Type',
+    ]);
 
     const buffer = await writeXlsxFile(sheets).toBuffer();
     const parsed = await readSheet(buffer);
@@ -119,7 +149,16 @@ describe('downloadable template', () => {
   it('includes a field guide on the Instructions sheet', async () => {
     const instructions = buildTemplateSheets()[1];
     const text = JSON.stringify(instructions.data);
-    for (const field of ['Vehicle No.', 'IOP ID', 'Chassis No.', 'Motor No.', 'Controller No.', 'Type']) {
+    for (const field of [
+      'Vehicle No.',
+      'IOP ID',
+      'Chassis No.',
+      'Motor No.',
+      'Controller No.',
+      'Driver ID',
+      'Battery ID',
+      'Type',
+    ]) {
       expect(text).toContain(field);
     }
     expect(text).toContain('500');

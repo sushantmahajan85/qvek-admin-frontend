@@ -343,7 +343,16 @@ export function buildState(inp: LiveInputs): State {
     const history: HistoryItem[] = [];
     if (row.createdAt) history.push({ id: `h-created-${row.id}`, at: ms(row.createdAt), type: 'created', title: 'Vehicle record created', detail: `Registered as ${row.vehicleNo}` });
     (row.componentHistory ?? []).forEach((c, i) => {
-      const label = c.component === 'motorNo' ? 'Motor' : c.component === 'controllerNo' ? 'Controller' : 'Chassis';
+      const label =
+        c.component === 'motorNo'
+          ? 'Motor'
+          : c.component === 'controllerNo'
+            ? 'Controller'
+            : c.component === 'driverId'
+              ? 'Driver ID'
+              : c.component === 'batteryId'
+                ? 'Battery ID'
+                : 'Chassis';
       history.push({
         id: `h-comp-${row.id}-${i}`,
         at: ms(c.at),
@@ -372,6 +381,8 @@ export function buildState(inp: LiveInputs): State {
       chassisNo: row.chassisNo || '—',
       motorNo: row.motorNo || '—',
       controllerNo: row.controllerNo || '—',
+      driverId: row.driverId || '—',
+      batteryId: row.batteryId || '—',
       model: row.type === 'LIGHT_2W' ? 'Qvek light scooter (single type)' : row.type,
       riderId: row.rider?.id ?? null,
       status,

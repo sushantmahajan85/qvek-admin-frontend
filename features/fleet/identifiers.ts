@@ -2,6 +2,8 @@ export const VEHICLE_IDENTIFIER_RE = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;
 
 export const VEHICLE_NO_ERROR = 'Please enter valid Vehicle No.';
 export const MOTOR_NO_ERROR = 'Please enter valid Motor No.';
+export const DRIVER_ID_ERROR = 'Please enter valid Driver ID';
+export const BATTERY_ID_ERROR = 'Please enter valid Battery ID';
 export const CHASSIS_NO_ERROR = 'Please enter valid Chassis No.';
 export const IOP_ID_ERROR = 'Please enter valid IOP ID';
 

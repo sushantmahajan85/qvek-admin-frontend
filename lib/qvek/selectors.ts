@@ -114,7 +114,13 @@ export function matchRider(r: Rider, q: string) {
 export function matchVehicle(v: Vehicle, q: string) {
   if (!q) return true;
   const qq = q.toLowerCase().replace(/\s/g, "");
-  if ([v.regNo, v.iopId, v.chassisNo, v.motorNo, v.controllerNo].some((x) => String(x).toLowerCase().replace(/\s/g, "").includes(qq))) return true;
+  if (
+    [v.regNo, v.iopId, v.chassisNo, v.motorNo, v.controllerNo, v.driverId, v.batteryId].some((x) =>
+      String(x).toLowerCase().replace(/\s/g, "").includes(qq),
+    )
+  ) {
+    return true;
+  }
   const r = G.vehicleRider(v);
   return r ? matchRider(r, q) : false;
 }

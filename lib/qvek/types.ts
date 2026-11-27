@@ -150,6 +150,8 @@ export interface Vehicle {
   chassisNo: string;
   motorNo: string;
   controllerNo: string;
+  driverId: string;
+  batteryId: string;
   model: string;
   riderId: string | null;
   status: AssetStatus;

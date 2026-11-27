@@ -3,8 +3,10 @@ import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api-client';
 import type { RiderStatus, VehicleStatus } from '@/lib/constants';
 
 import {
+  BATTERY_ID_ERROR,
   CHASSIS_NO_ERROR,
   COMPONENT_ID_MAX,
+  DRIVER_ID_ERROR,
   isIopId,
   isVehicleIdentifier,
   IOP_ID_ERROR,
@@ -37,6 +39,8 @@ export interface FleetRow {
   chassisNo?: string | null;
   motorNo?: string | null;
   controllerNo?: string | null;
+  driverId?: string | null;
+  batteryId?: string | null;
   componentHistory?: ComponentHistoryEntry[] | null;
   createdAt?: string;
   lat: number | null;
@@ -64,6 +68,8 @@ export interface Vehicle {
   chassisNo?: string | null;
   motorNo?: string | null;
   controllerNo?: string | null;
+  driverId?: string | null;
+  batteryId?: string | null;
 }
 
 const vehicleId = (min: number, max: number, message: string) =>
@@ -95,6 +101,8 @@ export const vehicleSchema = z.object({
   chassisNo: vehicleId(2, COMPONENT_ID_MAX, CHASSIS_NO_ERROR),
   motorNo: vehicleId(1, COMPONENT_ID_MAX, MOTOR_NO_ERROR),
   controllerNo: vehicleId(1, COMPONENT_ID_MAX, MOTOR_NO_ERROR),
+  driverId: vehicleId(1, COMPONENT_ID_MAX, DRIVER_ID_ERROR),
+  batteryId: vehicleId(1, COMPONENT_ID_MAX, BATTERY_ID_ERROR),
 });
 export type VehicleInput = z.infer<typeof vehicleSchema>;
 
@@ -153,6 +161,8 @@ export interface VehicleRecord {
   chassisNo: string;
   motorNo: string;
   controllerNo: string;
+  driverId: string;
+  batteryId: string;
 }
 
 export const vehicleRecordSchema = z.object({
@@ -166,6 +176,8 @@ export const vehicleRecordSchema = z.object({
   chassisNo: vehicleId(2, COMPONENT_ID_MAX, CHASSIS_NO_ERROR),
   motorNo: vehicleId(1, COMPONENT_ID_MAX, MOTOR_NO_ERROR),
   controllerNo: vehicleId(1, COMPONENT_ID_MAX, MOTOR_NO_ERROR),
+  driverId: vehicleId(1, COMPONENT_ID_MAX, DRIVER_ID_ERROR),
+  batteryId: vehicleId(1, COMPONENT_ID_MAX, BATTERY_ID_ERROR),
 });
 
 export async function updateRecord(id: string, input: VehicleRecord) {

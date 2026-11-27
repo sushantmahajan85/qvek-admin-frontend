@@ -20,11 +20,15 @@ describe('collectAddVehicleErrors (Admin_Bug07)', () => {
       chassis: '',
       motor: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
       controller: 'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk',
+      driver: '-----',
+      battery: '-----',
     });
     expect(err.vehicleNo).toBe('Vehicle number is invalid');
     expect(err.iopId).toBe('IOP Device ID is invalid');
     expect(err.chassis).toBe('Chassis No. is required');
     expect(err.motor).toBe('Motor No. is invalid');
     expect(err.controller).toBe('Controller No. is invalid');
+    expect(err.driver).toBe('Driver ID is invalid');
+    expect(err.battery).toBe('Battery ID is invalid');
   });
 });

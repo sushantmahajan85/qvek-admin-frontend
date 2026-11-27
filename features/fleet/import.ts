@@ -33,7 +33,7 @@ export interface ParsedImport {
   total: number;
 }
 
-type Field = 'vehicleNo' | 'iopId' | 'chassisNo' | 'motorNo' | 'controllerNo' | 'type';
+type Field = 'vehicleNo' | 'iopId' | 'chassisNo' | 'motorNo' | 'controllerNo' | 'driverId' | 'batteryId' | 'type';
 
 /** Tolerant header map: "Vehicle No.", "vehicle_number", "VehicleNumber" all match. */
 const HEADER_ALIASES: Record<string, Field> = {
@@ -63,6 +63,12 @@ const HEADER_ALIASES: Record<string, Field> = {
   controllerno: 'controllerNo',
   controllernumber: 'controllerNo',
   controller: 'controllerNo',
+  driverid: 'driverId',
+  driverno: 'driverId',
+  driver: 'driverId',
+  batteryid: 'batteryId',
+  batteryno: 'batteryId',
+  battery: 'batteryId',
   type: 'type',
   model: 'type',
   vehicletype: 'type',
@@ -180,9 +186,11 @@ export async function parseVehiclesFile(file: File): Promise<ParsedImport> {
     const candidate = {
       vehicleNo: raw.vehicleNo ?? '',
       iopId: raw.iopId ?? '',
-      ...(raw.chassisNo ? { chassisNo: raw.chassisNo } : {}),
-      ...(raw.motorNo ? { motorNo: raw.motorNo } : {}),
-      ...(raw.controllerNo ? { controllerNo: raw.controllerNo } : {}),
+      chassisNo: raw.chassisNo ?? '',
+      motorNo: raw.motorNo ?? '',
+      controllerNo: raw.controllerNo ?? '',
+      driverId: raw.driverId ?? '',
+      batteryId: raw.batteryId ?? '',
       ...(raw.type ? { type: raw.type } : {}),
     };
     const issue = (message: string) =>
@@ -192,7 +200,16 @@ export async function parseVehiclesFile(file: File): Promise<ParsedImport> {
     if (!parsed.success) {
       const first = parsed.error.issues[0];
       const which = String(first?.path[0] ?? '');
-      const label = which === 'vehicleNo' ? 'Vehicle No.' : which === 'iopId' ? 'IOP ID' : which;
+      const label =
+        which === 'vehicleNo'
+          ? 'Vehicle No.'
+          : which === 'iopId'
+            ? 'IOP ID'
+            : which === 'driverId'
+              ? 'Driver ID'
+              : which === 'batteryId'
+                ? 'Battery ID'
+                : which;
       issue(`${label} is invalid: ${first?.message ?? 'check the value'}.`);
       return;
     }
@@ -228,6 +245,8 @@ const FIELD_GUIDE: Array<[string, string, string, string]> = [
   ['Chassis No.', 'Required', 'CH-10001', 'Master record; must be unique across the fleet'],
   ['Motor No.', 'Required', 'MT-10001', 'Kept in component history on replacement'],
   ['Controller No.', 'Required', 'CT-10001', 'Kept in component history on replacement'],
+  ['Driver ID', 'Required', 'DR-10001', 'Onboard driver unit identifier'],
+  ['Battery ID', 'Required', 'BAT-10001', 'Battery pack identifier'],
   ['Type', 'Optional', 'LIGHT_2W', 'Defaults to LIGHT_2W when left blank'],
 ];
 
@@ -257,7 +276,16 @@ export function buildTemplateSheets(): TemplateSheet[] {
   const note = (value: string) => ({ value, textColor: '#3F3F46' });
 
   const vehicles: SheetData = [
-    [head('Vehicle No.', true), head('IOP ID', true), head('Chassis No.', false), head('Motor No.', false), head('Controller No.', false), head('Type', false)],
+    [
+      head('Vehicle No.', true),
+      head('IOP ID', true),
+      head('Chassis No.', true),
+      head('Motor No.', true),
+      head('Controller No.', true),
+      head('Driver ID', true),
+      head('Battery ID', true),
+      head('Type', false),
+    ],
   ];
 
   const instructions: SheetData = [
@@ -295,7 +323,16 @@ export function buildTemplateSheets(): TemplateSheet[] {
     {
       data: vehicles,
       sheet: 'Vehicles',
-      columns: [{ width: 18 }, { width: 22 }, { width: 20 }, { width: 18 }, { width: 20 }, { width: 14 }],
+      columns: [
+        { width: 18 },
+        { width: 22 },
+        { width: 20 },
+        { width: 18 },
+        { width: 20 },
+        { width: 18 },
+        { width: 18 },
+        { width: 14 },
+      ],
       stickyRowsCount: 1,
     },
     {

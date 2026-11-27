@@ -18,8 +18,10 @@ import { riderIndianPhoneError, SUPPORT_PHONE_ERROR, toSupportPhoneE164 } from "
 import { useBulkCreateVehicles, useUpdateRecord, useCreateVehicle, useDisarmVehicle, useReactivateVehicle } from "@/features/fleet/hooks";
 import { vehicleRecordSchema, vehicleSchema, type BulkVehiclesResult } from "@/features/fleet/api";
 import {
+  BATTERY_ID_ERROR,
   CHASSIS_NO_ERROR,
   COMPONENT_ID_MAX,
+  DRIVER_ID_ERROR,
   IOP_ID_ERROR,
   IOP_ID_MAX,
   MOTOR_NO_ERROR,
@@ -412,6 +414,8 @@ export function ComponentsFlow({ id }: { id: string }) {
   const [chassis, setChassis] = useState(blank(v.chassisNo));
   const [motor, setMotor] = useState(blank(v.motorNo));
   const [ctrl, setCtrl] = useState(blank(v.controllerNo));
+  const [driver, setDriver] = useState(blank(v.driverId));
+  const [battery, setBattery] = useState(blank(v.batteryId));
   const [errs, setErrs] = useState<Record<string, string>>({});
   const cls = (f: string, extra = "") => "field" + extra + (errs[f] ? " has-error" : "");
   const fieldErr = (f: string) => (errs[f] ? <FieldError>{errs[f]}</FieldError> : null);
@@ -421,6 +425,8 @@ export function ComponentsFlow({ id }: { id: string }) {
     chassis: vehicleIdentifierError(chassis, 2, false, COMPONENT_ID_MAX, CHASSIS_NO_ERROR),
     motor: vehicleIdentifierError(motor, 1, false, COMPONENT_ID_MAX, MOTOR_NO_ERROR),
     controller: vehicleIdentifierError(ctrl, 1, false, COMPONENT_ID_MAX, MOTOR_NO_ERROR),
+    driver: vehicleIdentifierError(driver, 1, false, COMPONENT_ID_MAX, DRIVER_ID_ERROR),
+    battery: vehicleIdentifierError(battery, 1, false, COMPONENT_ID_MAX, BATTERY_ID_ERROR),
   };
   return (
     <Modal
@@ -441,6 +447,8 @@ export function ComponentsFlow({ id }: { id: string }) {
             const ch = sanitizeVehicleIdentifierInput(chassis).trim().toUpperCase();
             const mo = sanitizeVehicleIdentifierInput(motor).trim().toUpperCase();
             const co = sanitizeVehicleIdentifierInput(ctrl).trim().toUpperCase();
+            const dr = sanitizeVehicleIdentifierInput(driver).trim().toUpperCase();
+            const bat = sanitizeVehicleIdentifierInput(battery).trim().toUpperCase();
             const e: Record<string, string> = {};
             if (vehicleIdentifierError(vn, 2, false, VEHICLE_NO_MAX, VEHICLE_NO_ERROR)) {
               e.vehicleNo = VEHICLE_NO_ERROR;
@@ -455,6 +463,12 @@ export function ComponentsFlow({ id }: { id: string }) {
             if (vehicleIdentifierError(co, 1, false, COMPONENT_ID_MAX, MOTOR_NO_ERROR)) {
               e.controller = MOTOR_NO_ERROR;
             }
+            if (vehicleIdentifierError(dr, 1, false, COMPONENT_ID_MAX, DRIVER_ID_ERROR)) {
+              e.driver = DRIVER_ID_ERROR;
+            }
+            if (vehicleIdentifierError(bat, 1, false, COMPONENT_ID_MAX, BATTERY_ID_ERROR)) {
+              e.battery = BATTERY_ID_ERROR;
+            }
             setErrs(e);
             if (Object.keys(e).length) return false;
             const parsed = vehicleRecordSchema.safeParse({
@@ -463,10 +477,18 @@ export function ComponentsFlow({ id }: { id: string }) {
               chassisNo: ch,
               motorNo: mo,
               controllerNo: co,
+              driverId: dr,
+              batteryId: bat,
             });
             if (!parsed.success) {
               const toFormField = (path: string) =>
-                ({ chassisNo: 'chassis', motorNo: 'motor', controllerNo: 'controller' }[path] ?? path);
+                ({
+                  chassisNo: 'chassis',
+                  motorNo: 'motor',
+                  controllerNo: 'controller',
+                  driverId: 'driver',
+                  batteryId: 'battery',
+                }[path] ?? path);
               for (const issue of parsed.error.issues) {
                 const key = toFormField(String(issue.path[0] ?? ''));
                 if (key && !e[key]) e[key] = issue.message;
@@ -575,6 +597,34 @@ export function ComponentsFlow({ id }: { id: string }) {
           />
           {fieldErr("controller") ?? (live.controller ? <FieldError>{live.controller}</FieldError> : null)}
         </div>
+        <div className={cls("driver")}>
+          <label htmlFor="cm-driver">
+            Driver ID <span className="req">*</span>
+          </label>
+          <input
+            className="input"
+            id="cm-driver"
+            maxLength={COMPONENT_ID_MAX}
+            value={driver}
+            onChange={(e) => setDriver(sanitizeVehicleIdentifierInput(e.target.value))}
+            autoComplete="off"
+          />
+          {fieldErr("driver") ?? (live.driver ? <FieldError>{live.driver}</FieldError> : null)}
+        </div>
+        <div className={cls("battery")}>
+          <label htmlFor="cm-battery">
+            Battery ID <span className="req">*</span>
+          </label>
+          <input
+            className="input"
+            id="cm-battery"
+            maxLength={COMPONENT_ID_MAX}
+            value={battery}
+            onChange={(e) => setBattery(sanitizeVehicleIdentifierInput(e.target.value))}
+            autoComplete="off"
+          />
+          {fieldErr("battery") ?? (live.battery ? <FieldError>{live.battery}</FieldError> : null)}
+        </div>
       </div>
     </Modal>
   );
@@ -588,6 +638,8 @@ export function AddVehicleFlow() {
   const [chassis, setChassis] = useState("");
   const [motor, setMotor] = useState("");
   const [ctrl, setCtrl] = useState("");
+  const [driver, setDriver] = useState("");
+  const [battery, setBattery] = useState("");
   const [errs, setErrs] = useState<Record<string, string>>({});
   const cls = (f: string, extra = "") => "field" + extra + (errs[f] ? " has-error" : "");
   const err = (f: string) => (errs[f] ? <FieldError>{errs[f]}</FieldError> : null);
@@ -597,6 +649,8 @@ export function AddVehicleFlow() {
     chassis: addVehicleFieldError("chassis", chassis),
     motor: addVehicleFieldError("motor", motor),
     controller: addVehicleFieldError("controller", ctrl),
+    driver: addVehicleFieldError("driver", driver),
+    battery: addVehicleFieldError("battery", battery),
   };
   return (
     <Modal
@@ -617,12 +671,16 @@ export function AddVehicleFlow() {
             const ch = sanitizeVehicleIdentifierInput(chassis).trim().toUpperCase();
             const mo = sanitizeVehicleIdentifierInput(motor).trim().toUpperCase();
             const co = sanitizeVehicleIdentifierInput(ctrl).trim().toUpperCase();
+            const dr = sanitizeVehicleIdentifierInput(driver).trim().toUpperCase();
+            const bat = sanitizeVehicleIdentifierInput(battery).trim().toUpperCase();
             const e = collectAddVehicleErrors({
               vehicleNo: vn,
               iopId: io,
               chassis: ch,
               motor: mo,
               controller: co,
+              driver: dr,
+              battery: bat,
             });
             setErrs(e);
             if (Object.keys(e).length) return false;
@@ -632,6 +690,8 @@ export function AddVehicleFlow() {
               chassisNo: ch,
               motorNo: mo,
               controllerNo: co,
+              driverId: dr,
+              batteryId: bat,
             });
             if (!payload.success) {
               setErrs(
@@ -641,6 +701,8 @@ export function AddVehicleFlow() {
                   chassis: ch,
                   motor: mo,
                   controller: co,
+                  driver: dr,
+                  battery: bat,
                 }),
               );
               return false;
@@ -731,6 +793,36 @@ export function AddVehicleFlow() {
               onChange={(e) => setCtrl(sanitizeVehicleIdentifierInput(e.target.value))}
             />
             {err("controller") ?? (live.controller ? <FieldError>{live.controller}</FieldError> : null)}
+          </div>
+          <div className={cls("driver")}>
+            <label htmlFor="av-driver">
+              Driver ID <span className="req">*</span>
+            </label>
+            <input
+              className="input"
+              id="av-driver"
+              autoComplete="off"
+              maxLength={COMPONENT_ID_MAX}
+              value={driver}
+              onChange={(e) => setDriver(sanitizeVehicleIdentifierInput(e.target.value))}
+              placeholder="e.g. DR-10001"
+            />
+            {err("driver") ?? (live.driver ? <FieldError>{live.driver}</FieldError> : null)}
+          </div>
+          <div className={cls("battery")}>
+            <label htmlFor="av-battery">
+              Battery ID <span className="req">*</span>
+            </label>
+            <input
+              className="input"
+              id="av-battery"
+              autoComplete="off"
+              maxLength={COMPONENT_ID_MAX}
+              value={battery}
+              onChange={(e) => setBattery(sanitizeVehicleIdentifierInput(e.target.value))}
+              placeholder="e.g. BAT-10001"
+            />
+            {err("battery") ?? (live.battery ? <FieldError>{live.battery}</FieldError> : null)}
           </div>
         </div>
       </form>
