@@ -9,7 +9,8 @@
  *
  * Nothing in here talks to the network and nothing is persisted.
  */
-import type { AssetStatus, Config, ExpenseType, KycKey, KycStatus, Rider, State, Vehicle, Zone, FinanceEntry } from "./types";
+import type { AssetStatus, Config, ExpenseType, KycStatus, Rider, State, Vehicle, Zone, FinanceEntry } from "./types";
+import { requiredDocSlots } from "./kyc-requirements";
 import { U } from "./utils";
 
 export const DEFAULT_CONFIG: Config = {
@@ -110,7 +111,6 @@ export const D = {
           { kind: "aadhaar", title: "Aadhaar", required: true },
           { kind: "pan", title: "PAN", required: true },
         ];
-    const reqKeys = defs.filter((d) => d.required).map((d) => d.kind) as KycKey[];
     // A document counts as uploaded when either its masked number or its file is
     // on record. The rider app uploads files only, so numbers alone undercounted.
     const fileKinds = new Set((r.kycInfo?.docs ?? []).map((d) => d.kind.trim().toLowerCase()));
@@ -120,10 +120,22 @@ export const D = {
       if (fileKinds.has(kind.trim().toLowerCase())) return r.kycInfo?.verified ? "verified" : "submitted";
       return "missing";
     };
-    const docs = reqKeys.map((k) => statusOf(k));
-    const verified = docs.filter((d) => d === "verified").length;
-    const submitted = docs.filter((d) => d !== "missing").length;
-    return { verified, submitted, total: reqKeys.length, complete: submitted === reqKeys.length, allVerified: verified === reqKeys.length, dlSubmitted: statusOf("dl") !== "missing" };
+    // Aadhaar/PAN are one either-or slot; each other required kind is its own.
+    const slots = requiredDocSlots(defs);
+    const stateOf = (kinds: string[]) => kinds.map(statusOf).filter((s) => s !== "missing");
+    const verified = slots.filter((kinds) => {
+      const present = stateOf(kinds);
+      return present.length > 0 && present.every((s) => s === "verified");
+    }).length;
+    const submitted = slots.filter((kinds) => stateOf(kinds).length > 0).length;
+    return {
+      verified,
+      submitted,
+      total: slots.length,
+      complete: submitted === slots.length,
+      allVerified: verified === slots.length,
+      dlSubmitted: statusOf("dl") !== "missing",
+    };
   },
   availableVehicles() {
     return S().vehicles.filter((v) => !v.riderId && v.status === "Inactive");

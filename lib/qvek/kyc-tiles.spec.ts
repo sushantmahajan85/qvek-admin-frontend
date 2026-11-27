@@ -37,6 +37,25 @@ describe('KYC tiles', () => {
     expect(aadhaar).toMatchObject({ status: 'submitted', fileName: 'aadhaar.jpg', fileUrl: 'https://x/a.jpg' });
   });
 
+  it('marks the other identity document optional once one is uploaded', () => {
+    const [aadhaar, pan] = kycTileModels(
+      rider({
+        kyc: { aadhaar: { status: 'submitted' }, pan: { status: 'missing' }, dl: { status: 'missing' } },
+        kycInfo: {
+          fullName: null,
+          aadhaar: null,
+          pan: null,
+          dlNo: null,
+          verified: false,
+          docs: [{ key: 'k/a.jpg', kind: 'aadhaar', name: 'a.jpg', url: 'https://x/a.jpg' }],
+        },
+      }),
+      [],
+    );
+    expect(aadhaar.statusLabel).toBe('Submitted');
+    expect(pan).toMatchObject({ statusLabel: 'Optional', satisfiedByOther: true });
+  });
+
   it('matches uploaded kind case-insensitively', () => {
     const [aadhaar] = kycTileModels(
       rider({

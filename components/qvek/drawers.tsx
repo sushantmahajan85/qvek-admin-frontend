@@ -248,7 +248,7 @@ export function DocTiles({ r }: { r: Rider }) {
             <Badge tone="green">Verified</Badge>
           ) : tile.status === "submitted" ? (
             <Badge tone="amber">Submitted</Badge>
-          ) : tile.required ? (
+          ) : tile.required && !tile.satisfiedByOther ? (
             <Badge tone="red">Missing</Badge>
           ) : (
             <Badge tone="grey">Optional</Badge>

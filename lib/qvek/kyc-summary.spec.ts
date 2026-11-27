@@ -36,22 +36,27 @@ describe('KYC summary (onboarding count)', () => {
   it('counts uploaded FILES even when no masked numbers were submitted', () => {
     // This was the bug: the rider app uploads files only, so the queue showed 0/2.
     const k = D.kycSummary(rider({ docs: ['aadhaar', 'pan'] }));
-    expect(k).toMatchObject({ submitted: 2, total: 2, complete: true, allVerified: false });
+    expect(k).toMatchObject({ submitted: 1, total: 1, complete: true, allVerified: false });
+  });
+
+  it('treats Aadhaar and PAN as alternatives — either one is enough', () => {
+    expect(D.kycSummary(rider({ docs: ['aadhaar'] }))).toMatchObject({ submitted: 1, total: 1, complete: true });
+    expect(D.kycSummary(rider({ docs: ['pan'] }))).toMatchObject({ submitted: 1, total: 1, complete: true });
   });
 
   it('still counts masked numbers when there are no files', () => {
     const k = D.kycSummary(rider({ numbers: { aadhaar: 'submitted', pan: 'submitted' } }));
-    expect(k).toMatchObject({ submitted: 2, total: 2, complete: true });
+    expect(k).toMatchObject({ submitted: 1, total: 1, complete: true });
   });
 
   it('merges files and numbers per document', () => {
     const k = D.kycSummary(rider({ numbers: { aadhaar: 'submitted' }, docs: ['pan'] }));
-    expect(k).toMatchObject({ submitted: 2, complete: true });
+    expect(k).toMatchObject({ submitted: 1, complete: true });
   });
 
   it('marks the set verified only when the KYC record is verified', () => {
     const k = D.kycSummary(rider({ docs: ['aadhaar', 'pan'], verified: true }));
-    expect(k).toMatchObject({ verified: 2, allVerified: true });
+    expect(k).toMatchObject({ verified: 1, allVerified: true });
   });
 
   it('counts server-driven required kinds (custom documents)', () => {
@@ -64,7 +69,7 @@ describe('KYC summary (onboarding count)', () => {
     store.replace(s);
 
     expect(D.kycSummary(rider({ docs: ['aadhaar', 'pan'] })).complete).toBe(false);
-    expect(D.kycSummary(rider({ docs: ['aadhaar', 'pan', 'rc'] }))).toMatchObject({ submitted: 3, total: 3, complete: true });
+    expect(D.kycSummary(rider({ docs: ['aadhaar', 'pan', 'rc'] }))).toMatchObject({ submitted: 2, total: 2, complete: true });
   });
 
   it('reports an optional DL separately', () => {
@@ -73,6 +78,6 @@ describe('KYC summary (onboarding count)', () => {
   });
 
   it('reports nothing uploaded when the KYC record is empty', () => {
-    expect(D.kycSummary(rider({}))).toMatchObject({ submitted: 0, total: 2, complete: false, dlSubmitted: false });
+    expect(D.kycSummary(rider({}))).toMatchObject({ submitted: 0, total: 1, complete: false, dlSubmitted: false });
   });
 });

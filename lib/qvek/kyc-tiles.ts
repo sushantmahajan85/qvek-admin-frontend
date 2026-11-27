@@ -7,6 +7,7 @@
  * are matched case-insensitively.
  */
 import type { KycDoc, KycKey, KycStatus, Rider } from "./types";
+import { isIdentityDoc } from "./kyc-requirements";
 
 export interface KycTile {
   kind: string;
@@ -17,6 +18,8 @@ export interface KycTile {
   status: KycStatus;
   /** Human label for the status badge. */
   statusLabel: string;
+  /** Missing, but the Aadhaar/PAN alternative is on file. */
+  satisfiedByOther: boolean;
   fileName?: string;
   fileUrl?: string;
 }
@@ -41,6 +44,13 @@ export function kycTileModels(
   const defs = configured.filter((d) => !!d?.kind?.trim());
   const list = defs.length ? defs : BUILTIN_KYC_DOCS;
   const docs = r.kycInfo?.docs ?? [];
+  const isPresent = (kind: string): boolean => {
+    const key = kind.trim().toLowerCase();
+    const number = KNOWN_KINDS[key] ? r.kyc?.[key as KycKey]?.status : undefined;
+    return (!!number && number !== "missing") || docs.some((d) => d.kind.trim().toLowerCase() === key);
+  };
+  // Either Aadhaar or PAN satisfies the shared identity requirement.
+  const identitySatisfied = list.some((d) => isIdentityDoc(d.kind) && isPresent(d.kind));
 
   return list.map((def) => {
     const kind = def.kind.trim();
@@ -50,6 +60,7 @@ export function kycTileModels(
     const status: KycStatus = doc?.status ?? "missing";
     const file = docs.find((d) => d.kind.trim().toLowerCase() === key) ?? null;
     const title = (known ? KNOWN_TITLES[key] : undefined) || def.title?.trim() || kind || "Document";
+    const satisfiedByOther = status === "missing" && isIdentityDoc(kind) && identitySatisfied;
 
     return {
       kind,
@@ -57,7 +68,15 @@ export function kycTileModels(
       required: def.required,
       known,
       status,
-      statusLabel: status === "verified" ? "Verified" : status === "submitted" ? "Submitted" : def.required ? "Missing" : "Optional",
+      statusLabel:
+        status === "verified"
+          ? "Verified"
+          : status === "submitted"
+            ? "Submitted"
+            : satisfiedByOther || !def.required
+              ? "Optional"
+              : "Missing",
+      satisfiedByOther,
       fileName: file?.name ?? doc?.file ?? undefined,
       fileUrl: file?.url ?? undefined,
     };
