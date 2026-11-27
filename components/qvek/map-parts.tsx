@@ -6,6 +6,7 @@ import type { KeyboardEvent } from "react";
 import { G, store } from "@/lib/qvek/store";
 import { KIND_LABEL, ZC, vKind } from "@/lib/qvek/selectors";
 import type { Vehicle } from "@/lib/qvek/types";
+import { EvScooter } from "./ev-scooter";
 
 const FONT = "Segoe UI, system-ui, sans-serif";
 
@@ -89,16 +90,18 @@ export function Marker({ v, selected, onSelect }: { v: Vehicle; selected: boolea
       onClick={onSelect ? () => onSelect(v.id) : undefined}
       onKeyDown={onKey}
     >
-      <circle className="marker__ring" r="9.5" fill={c} fillOpacity=".25" stroke={c} strokeWidth="1.5" />
-      <circle className="marker__dot" r="5" fill={c} />
+      {/* Focus/selected outline only — the scooter itself carries the colour.
+          Invisible until :focus-visible / .is-selected sets a stroke (admin.css). */}
+      <ellipse className="marker__ring" rx="18" ry="13" fill="none" stroke="none" strokeWidth={2} />
+      <EvScooter body={c} width={32} className="marker__dot" />
       {k === "recovery" ? (
-        <>
+        <g transform="translate(0 -14)">
           <path d="M0 -21c-4 0-7 3-7 7 0 5 7 10 7 10s7-5 7-10c0-4-3-7-7-7z" fill={c} />
           <circle cy="-14" r="2.4" fill="#0B1120" />
-        </>
+        </g>
       ) : null}
       {selected ? (
-        <g transform={`translate(0 ${k === "recovery" ? -32 : -22})`}>
+        <g transform={`translate(0 ${k === "recovery" ? -46 : -22})`}>
           <rect x="-46" y="-16" width="92" height="20" rx="6" fill="#F3F6FB" />
           <text y="-2" textAnchor="middle" fontSize="11" fontWeight="800" fill="#0B1120" fontFamily={FONT} letterSpacing=".5">{v.regNo}</text>
         </g>

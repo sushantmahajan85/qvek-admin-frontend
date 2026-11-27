@@ -1,30 +1,25 @@
 "use client";
 
 /* Live fleet map on Google Maps (replaces the Leaflet/OSM version):
- * hub + zone circles, vehicle pins colored by backend zone, click → select.
- * Data: GET /admin/map every 60s. No-signal vehicles are listed, not pinned.
+ * hub + zone circles, each vehicle drawn as a Qvek scooter tinted by its
+ * backend zone colour, click → select. Data: GET /admin/map every 60s.
+ * No-signal vehicles are listed, not pinned.
  * Needs NEXT_PUBLIC_GOOGLE_MAPS_API_KEY (HTTP-referrer-restricted web key).
  */
 
 import * as React from 'react';
 import { Circle, GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 import { useAdminMap } from '@/features/fleet/hooks';
+import { scooterMarkerIcon } from './ev-scooter';
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
 
 const containerStyle = { width: '100%', height: '100%' } as const;
 
-function DotIcon(color: string, selected: boolean): google.maps.Symbol | undefined {
-  if (typeof window === 'undefined' || !window.google) return undefined;
-  return {
-    path: window.google.maps.SymbolPath.CIRCLE,
-    fillColor: color,
-    fillOpacity: 1,
-    strokeColor: selected ? '#1C1C1C' : '#ffffff',
-    strokeWeight: selected ? 4 : 3,
-    scale: selected ? 11 : 9,
-  };
-}
+/** Marker width in px; the selected scooter is drawn larger so it reads out of
+ *  a cluster. Heights follow the artwork's aspect ratio. */
+const MARKER_WIDTH = 44;
+const MARKER_WIDTH_SELECTED = 56;
 
 const HUB_ICON: google.maps.Symbol | undefined =
   typeof window !== 'undefined' && window.google
@@ -58,6 +53,28 @@ export function FleetGoogleMap({
     () => (data?.vehicles ?? []).filter((v) => v.lat != null && v.lng != null && visibleIds.has(v.id)),
     [data, visibleIds],
   );
+  // Built once per (colour, selected) pair rather than per marker per render —
+  // the icon is an encoded SVG data URI, and the fleet is refetched every 60s.
+  const iconCache = React.useRef(new Map<string, google.maps.Icon>());
+  const iconFor = React.useCallback((color: string, selected: boolean): google.maps.Icon => {
+    const key = `${selected ? 'sel' : 'idle'}:${color}`;
+    const cached = iconCache.current.get(key);
+    if (cached) return cached;
+    const { url, width, height } = scooterMarkerIcon(color, {
+      width: selected ? MARKER_WIDTH_SELECTED : MARKER_WIDTH,
+      selected,
+    });
+    const icon: google.maps.Icon = {
+      url,
+      scaledSize: new window.google.maps.Size(width, height),
+      // Anchor on the centre of the scooter: the marker sits *on* the reported
+      // position rather than balancing on top of it, and Google draws the
+      // number plate label just below the artwork.
+      anchor: new window.google.maps.Point(width / 2, height / 2),
+    };
+    iconCache.current.set(key, icon);
+    return icon;
+  }, []);
   // GoogleMap calls map.setCenter() whenever the `center` prop changes identity.
   // Computing a new object each render re-centred the map mid-drag whenever the
   // 30s auto-refresh / 60s refetch happened. Keep one stable object: set it on
@@ -163,9 +180,10 @@ export function FleetGoogleMap({
           <Marker
             key={v.id}
             position={{ lat: v.lat as number, lng: v.lng as number }}
-            icon={DotIcon(v.color, v.id === selectedId)}
+            icon={iconFor(v.color, v.id === selectedId)}
             label={{ text: v.vehicleNo, color: '#1C1C1C', fontSize: '10px', fontWeight: '700' }}
             title={v.vehicleNo}
+            zIndex={v.id === selectedId ? 1000 : undefined}
             onClick={() => onSelect(v.id)}
           />
         ))}
